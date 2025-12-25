@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Modal, TextInput } from 'react-native';
 import { orderService, restaurantService } from '../../services';
 import { Order, OrderStatus } from '../../../shared/api-contracts';
 
@@ -8,6 +8,10 @@ export const OrderManagementScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -42,13 +46,42 @@ export const OrderManagementScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, customerPin?: string) => {
     try {
-      await orderService.updateOrderStatus(orderId, { status: newStatus });
+      await orderService.updateOrderStatus(orderId, { 
+        status: newStatus,
+        customer_pin: customerPin,
+      });
       await loadOrders();
       Alert.alert('Success', 'Order status updated');
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update order');
+    }
+  };
+
+  const handleMarkPickedUp = (orderId: string) => {
+    setPendingOrderId(orderId);
+    setShowPinModal(true);
+    setPinInput('');
+  };
+
+  const handleConfirmPickup = async () => {
+    if (!pendingOrderId || pinInput.length !== 4) {
+      Alert.alert('Error', 'Please enter a valid 4-digit PIN');
+      return;
+    }
+
+    setUpdatingStatus(true);
+    try {
+      await updateOrderStatus(pendingOrderId, OrderStatus.PICKED_UP, pinInput);
+      setShowPinModal(false);
+      setPinInput('');
+      setPendingOrderId(null);
+    } catch (error) {
+      // Error already handled in updateOrderStatus
+      setPinInput('');
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -142,7 +175,19 @@ export const OrderManagementScreen: React.FC = () => {
               <Text style={styles.orderDate}>
                 {new Date(item.created_at).toLocaleString()}
               </Text>
-              <Text style={styles.paymentStatus}>Payment: Paid</Text>
+              <Text style={styles.paymentStatus}>
+                Payment: {item.payment_method === 'CASH_ON_PICKUP' ? '💵 Cash on Pickup' : '💳 Online'}
+              </Text>
+              {item.items && item.items.length > 0 && (
+                <View style={styles.itemsContainer}>
+                  <Text style={styles.itemsTitle}>Items:</Text>
+                  {item.items.map((orderItem) => (
+                    <Text key={orderItem.id} style={styles.itemText}>
+                      • {orderItem.menu_item_name || 'Item'} x {orderItem.quantity}
+                    </Text>
+                  ))}
+                </View>
+              )}
               
               <View style={styles.actionsRow}>
                 {item.status === OrderStatus.PENDING && (
@@ -164,7 +209,13 @@ export const OrderManagementScreen: React.FC = () => {
                 {nextStatus && item.status !== OrderStatus.PENDING && (
                   <TouchableOpacity
                     style={[styles.actionButton, styles.updateButton]}
-                    onPress={() => updateOrderStatus(item.id, nextStatus)}
+                    onPress={() => {
+                      if (nextStatus === OrderStatus.PICKED_UP) {
+                        handleMarkPickedUp(item.id);
+                      } else {
+                        updateOrderStatus(item.id, nextStatus);
+                      }
+                    }}
                   >
                     <Text style={styles.actionButtonText}>
                       Mark as {nextStatus.replace('_', ' ')}
@@ -179,6 +230,54 @@ export const OrderManagementScreen: React.FC = () => {
           !loading && <Text style={styles.emptyText}>No orders</Text>
         }
       />
+
+      <Modal
+        visible={showPinModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowPinModal(false);
+          setPinInput('');
+          setPendingOrderId(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Customer PIN</Text>
+            <Text style={styles.modalSubtitle}>Please ask the customer for their 4-digit PIN to mark order as picked up</Text>
+            <TextInput
+              style={styles.pinInput}
+              value={pinInput}
+              onChangeText={setPinInput}
+              placeholder="Enter 4-digit PIN"
+              keyboardType="number-pad"
+              maxLength={4}
+              secureTextEntry={false}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowPinModal(false);
+                  setPinInput('');
+                  setPendingOrderId(null);
+                }}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton, (updatingStatus || pinInput.length !== 4) && styles.modalButtonDisabled]}
+                onPress={handleConfirmPickup}
+                disabled={updatingStatus || pinInput.length !== 4}
+              >
+                <Text style={styles.modalButtonText}>
+                  {updatingStatus ? 'Processing...' : 'Confirm'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -224,7 +323,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#34C759',
     marginTop: 4,
+    marginBottom: 8,
+  },
+  itemsContainer: {
+    marginTop: 8,
     marginBottom: 12,
+    padding: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 6,
+  },
+  itemsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#333',
+  },
+  itemText: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -265,6 +382,66 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     color: '#999',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 24,
+    borderRadius: 16,
+    width: '80%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  pinInput: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 24,
+    textAlign: 'center',
+    letterSpacing: 8,
+    marginBottom: 20,
+    fontWeight: 'bold',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalButtonDisabled: {
+    opacity: 0.5,
+  },
+  cancelButton: {
+    backgroundColor: '#E0E0E0',
+  },
+  confirmButton: {
+    backgroundColor: '#34C759',
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 

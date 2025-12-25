@@ -42,26 +42,55 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
   }
 
   async findUserById(id: string): Promise<User | null> {
-    const query = `
-      SELECT id, phone, role, created_at
-      FROM users
-      WHERE id = $1
-      LIMIT 1
-    `;
+    try {
+      // Check if default_pin column exists, if not, use COALESCE to return null
+      const query = `
+        SELECT id, phone, role, COALESCE(default_pin, NULL) as default_pin, created_at
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+      `;
 
-    const result: QueryResult = await this.pool.query(query, [id]);
+      const result: QueryResult = await this.pool.query(query, [id]);
 
-    if (result.rows.length === 0) {
-      return null;
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        phone: row.phone,
+        role: row.role,
+        default_pin: row.default_pin || null,
+        created_at: row.created_at,
+      } as User;
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Unknown error';
+      // If column doesn't exist, try without it
+      if (errorMessage.includes('column "default_pin" does not exist')) {
+        console.warn('⚠️  default_pin column does not exist. Please run ADD_USER_DEFAULT_PIN.sql migration.');
+        const fallbackQuery = `
+          SELECT id, phone, role, created_at
+          FROM users
+          WHERE id = $1
+          LIMIT 1
+        `;
+        const result: QueryResult = await this.pool.query(fallbackQuery, [id]);
+        if (result.rows.length === 0) {
+          return null;
+        }
+        const row = result.rows[0];
+        return {
+          id: row.id,
+          phone: row.phone,
+          role: row.role,
+          default_pin: null,
+          created_at: row.created_at,
+        } as User;
+      }
+      throw error;
     }
-
-    const row = result.rows[0];
-    return {
-      id: row.id,
-      phone: row.phone,
-      role: row.role,
-      created_at: row.created_at,
-    } as User;
   }
 }
 

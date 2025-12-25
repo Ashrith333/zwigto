@@ -8,18 +8,24 @@ export class UsersService {
   constructor(private readonly databaseProvider: DatabaseProvider) {}
 
   async getProfile(userId: string): Promise<UserProfileDto> {
-    const user = await this.databaseProvider.findUserById(userId);
+    try {
+      const user = await this.databaseProvider.findUserById(userId);
 
-    if (!user) {
-      throw new NotFoundException('User not found');
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      return {
+        id: user.id,
+        phone: user.phone,
+        role: user.role,
+        default_pin: user.default_pin || undefined, // Include PIN for customer to see (undefined if not set)
+        created_at: user.created_at,
+      };
+    } catch (error: any) {
+      console.error('Error in getProfile:', error);
+      throw error;
     }
-
-    return {
-      id: user.id,
-      phone: user.phone,
-      role: user.role,
-      created_at: user.created_at,
-    };
   }
 
   async getUserById(userId: string): Promise<User | null> {

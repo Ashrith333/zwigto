@@ -77,19 +77,24 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
   async findMenuItemById(id: string): Promise<MenuItem | null> {
     const query = `
       SELECT id, restaurant_id, name, description, price, prep_time_minutes,
-             image_url, is_available, created_at, updated_at
+             food_type, image_url, is_available, created_at, updated_at
       FROM menu_items
       WHERE id = $1
       LIMIT 1
     `;
 
-    const result: QueryResult = await this.pool.query(query, [id]);
+    try {
+      const result: QueryResult = await this.pool.query(query, [id]);
 
-    if (result.rows.length === 0) {
-      return null;
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0] as MenuItem;
+    } catch (error: any) {
+      console.error(`Error finding menu item ${id}:`, error);
+      throw error;
     }
-
-    return result.rows[0] as MenuItem;
   }
 
   async findMenuItemsByRestaurantId(restaurantId: string): Promise<MenuItem[]> {

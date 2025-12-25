@@ -16,6 +16,8 @@ import { PaymentDetailsScreen } from './src/screens/restaurant/PaymentDetailsScr
 import { RestaurantRatingsScreen } from './src/screens/restaurant/RestaurantRatingsScreen';
 import { RestaurantOrderHistoryScreen } from './src/screens/restaurant/RestaurantOrderHistoryScreen';
 import { RestaurantMenuScreen } from './src/screens/user/RestaurantMenuScreen';
+import { CheckoutScreen } from './src/screens/user/CheckoutScreen';
+import { OrderTrackingScreen } from './src/screens/user/OrderTrackingScreen';
 import { AdminHomeScreen } from './src/screens/admin/AdminHomeScreen';
 import { RestaurantApprovalsScreen } from './src/screens/admin/RestaurantApprovalsScreen';
 import { ChangeRequestsScreen } from './src/screens/admin/ChangeRequestsScreen';
@@ -97,6 +99,16 @@ export default function App() {
           name="RestaurantMenu" 
           component={RestaurantMenuScreen}
           options={{ title: 'Menu' }}
+        />
+        <Stack.Screen 
+          name="Checkout" 
+          component={CheckoutScreen}
+          options={{ title: 'Checkout' }}
+        />
+        <Stack.Screen 
+          name="OrderTracking" 
+          component={OrderTrackingScreen}
+          options={{ title: 'Track Order' }}
         />
         <Stack.Screen 
           name="AdminHome" 

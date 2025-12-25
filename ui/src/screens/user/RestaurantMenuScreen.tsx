@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { menuService, restaurantService } from '../../services';
 import { MenuItem, RestaurantProfile } from '../../../shared/api-contracts';
 
 export const RestaurantMenuScreen: React.FC = () => {
   const route = useRoute();
+  const navigation = useNavigation();
   const { restaurantId } = route.params as { restaurantId: string };
   
   const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(null);
@@ -66,8 +67,17 @@ export const RestaurantMenuScreen: React.FC = () => {
   };
 
   const handleCheckout = () => {
-    // Navigate to checkout/payment screen
-    Alert.alert('Checkout', 'Proceed to payment');
+    if (getCartItemCount() === 0) {
+      Alert.alert('Empty Cart', 'Please add items to your cart');
+      return;
+    }
+    // Navigate to checkout screen with cart and restaurant info
+    navigation.navigate('Checkout', {
+      restaurantId: restaurantId,
+      restaurant: restaurant,
+      cart: cart,
+      menuItems: menuItems,
+    });
   };
 
   if (loading) {

@@ -43,12 +43,13 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
 
   async createOrder(
     userId: string,
-    data: {
+      data: {
       restaurant_id: string;
-      payment_id: string;
+      payment_id: string | null;
       total_amount: number;
       route_polyline: Array<{ latitude: number; longitude: number }>;
       items: Array<{ menu_item_id: string; quantity: number; price: number }>;
+      collection_pin: string | null;
     },
   ): Promise<Order> {
     const client = await this.pool.connect();
@@ -58,19 +59,20 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
 
       const orderQuery = `
         INSERT INTO orders (
-          user_id, restaurant_id, status, total_amount, payment_id, route_polyline
+          user_id, restaurant_id, status, total_amount, payment_id, route_polyline, collection_pin
         )
-        VALUES ($1, $2, 'PENDING', $3, $4, $5::jsonb)
+        VALUES ($1, $2, 'PENDING', $3, $4, $5::jsonb, $6)
         RETURNING id, user_id, restaurant_id, status, total_amount, payment_id,
-                  route_polyline, pickup_time, created_at, updated_at
+                  route_polyline, collection_pin, pickup_time, created_at, updated_at
       `;
 
       const orderResult: QueryResult = await client.query(orderQuery, [
         userId,
         data.restaurant_id,
         data.total_amount,
-        data.payment_id,
-        JSON.stringify(data.route_polyline),
+        data.payment_id || null, // Use NULL for cash on pickup
+        JSON.stringify(data.route_polyline || []),
+        data.collection_pin || null,
       ]);
 
       const order = orderResult.rows[0];
@@ -90,7 +92,12 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
           VALUES ${orderItemsValues}
         `;
 
-        await client.query(orderItemsQuery, orderItemsParams);
+        try {
+          await client.query(orderItemsQuery, orderItemsParams);
+        } catch (itemsError: any) {
+          console.error('Error inserting order items:', itemsError);
+          throw new Error(`Failed to insert order items: ${itemsError.message || 'Database error'}`);
+        }
       }
 
       await client.query('COMMIT');
@@ -102,6 +109,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
         status: order.status as OrderStatus,
         total_amount: parseFloat(order.total_amount),
         payment_id: order.payment_id,
+        collection_pin: order.collection_pin,
         route_polyline:
           typeof order.route_polyline === 'string'
             ? JSON.parse(order.route_polyline)
@@ -141,6 +149,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       status: row.status as OrderStatus,
       total_amount: parseFloat(row.total_amount),
       payment_id: row.payment_id,
+      collection_pin: row.collection_pin,
       route_polyline:
         typeof row.route_polyline === 'string'
           ? JSON.parse(row.route_polyline)
@@ -169,6 +178,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       status: row.status as OrderStatus,
       total_amount: parseFloat(row.total_amount),
       payment_id: row.payment_id,
+      collection_pin: row.collection_pin,
       route_polyline:
         typeof row.route_polyline === 'string'
           ? JSON.parse(row.route_polyline)
@@ -197,6 +207,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       status: row.status as OrderStatus,
       total_amount: parseFloat(row.total_amount),
       payment_id: row.payment_id,
+      collection_pin: row.collection_pin,
       route_polyline:
         typeof row.route_polyline === 'string'
           ? JSON.parse(row.route_polyline)
@@ -210,7 +221,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
   async findAllOrders(): Promise<Order[]> {
     const query = `
       SELECT id, user_id, restaurant_id, status, total_amount, payment_id,
-             route_polyline, pickup_time, created_at, updated_at
+             route_polyline, collection_pin, pickup_time, created_at, updated_at
       FROM orders
       ORDER BY created_at DESC
     `;
@@ -224,6 +235,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       status: row.status as OrderStatus,
       total_amount: parseFloat(row.total_amount),
       payment_id: row.payment_id,
+      collection_pin: row.collection_pin,
       route_polyline:
         typeof row.route_polyline === 'string'
           ? JSON.parse(row.route_polyline)
@@ -255,7 +267,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       SET ${updates.join(', ')}
       WHERE id = $${paramCount}
       RETURNING id, user_id, restaurant_id, status, total_amount, payment_id,
-                route_polyline, pickup_time, created_at, updated_at
+                route_polyline, collection_pin, pickup_time, created_at, updated_at
     `;
 
     const result: QueryResult = await this.pool.query(query, values);
@@ -272,6 +284,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       status: row.status as OrderStatus,
       total_amount: parseFloat(row.total_amount),
       payment_id: row.payment_id,
+      collection_pin: row.collection_pin,
       route_polyline:
         typeof row.route_polyline === 'string'
           ? JSON.parse(row.route_polyline)
@@ -280,6 +293,35 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       created_at: row.created_at,
       updated_at: row.updated_at,
     } as Order;
+  }
+
+  async findOrderItemsByOrderId(orderId: string): Promise<any[]> {
+    const query = `
+      SELECT oi.id, oi.order_id, oi.menu_item_id, oi.quantity, oi.price, oi.created_at,
+             mi.name as menu_item_name, mi.prep_time_minutes
+      FROM order_items oi
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      WHERE oi.order_id = $1
+      ORDER BY oi.created_at ASC
+    `;
+
+    try {
+      const result: QueryResult = await this.pool.query(query, [orderId]);
+
+      return result.rows.map((row) => ({
+        id: row.id,
+        order_id: row.order_id,
+        menu_item_id: row.menu_item_id,
+        quantity: row.quantity,
+        price: parseFloat(row.price || '0'),
+        created_at: row.created_at,
+        menu_item_name: row.menu_item_name,
+        prep_time_minutes: row.prep_time_minutes,
+      }));
+    } catch (error: any) {
+      console.error(`Error finding order items for order ${orderId}:`, error);
+      throw new Error(`Failed to fetch order items: ${error.message || 'Database error'}`);
+    }
   }
 }
 

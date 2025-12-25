@@ -13,7 +13,8 @@ export interface Order {
   restaurant_id: string;
   status: OrderStatus;
   total_amount: number;
-  payment_id: string;
+  payment_id: string | null; // Can be null for cash on pickup
+  collection_pin: string | null; // 6-digit PIN for order collection
   route_polyline: Array<{ latitude: number; longitude: number }>;
   pickup_time: Date | null;
   created_at: Date;

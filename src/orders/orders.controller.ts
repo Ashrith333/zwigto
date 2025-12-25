@@ -32,7 +32,15 @@ export class OrdersController {
     @Request() req: any,
     @Body() dto: CreateOrderDto,
   ): Promise<OrderDto> {
-    return this.ordersService.createOrder(req.user.id, dto);
+    try {
+      console.log('Creating order for user:', req.user.id);
+      console.log('Order DTO:', JSON.stringify(dto, null, 2));
+      return await this.ordersService.createOrder(req.user.id, dto);
+    } catch (error: any) {
+      console.error('Error in createOrder controller:', error);
+      console.error('Error stack:', error.stack);
+      throw error;
+    }
   }
 
   @Get('me')
@@ -102,6 +110,7 @@ export class OrdersController {
     @Param('id') id: string,
     @Request() req: any,
   ): Promise<OrderDto> {
+    // Note: Pickup is now handled by restaurant via updateOrderStatus with PIN verification
     return this.ordersService.completePickup(id, req.user.id);
   }
 }

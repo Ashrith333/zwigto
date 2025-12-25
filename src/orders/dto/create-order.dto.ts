@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsArray, IsObject, ValidateNested, Min } from 'class-validator';
+import { IsString, IsNumber, IsArray, IsObject, ValidateNested, Min, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class RoutePointDto {
@@ -23,7 +23,8 @@ export class CreateOrderDto {
   restaurant_id: string;
 
   @IsString()
-  payment_id: string;
+  @IsOptional()
+  payment_id?: string; // Optional for cash on pickup
 
   @IsNumber()
   @Min(0)
@@ -37,6 +38,7 @@ export class CreateOrderDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => RoutePointDto)
-  route_polyline: RoutePointDto[];
+  @IsOptional()
+  route_polyline?: RoutePointDto[]; // Optional for now
 }
 

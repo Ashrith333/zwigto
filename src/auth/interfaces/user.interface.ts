@@ -9,6 +9,7 @@ export interface User {
   phone: string;
   password_hash: string | null;
   role: UserRole;
+  default_pin: string | null; // 4-digit PIN for order pickup verification
 }
 
 export interface UserPayload {

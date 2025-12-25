@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { orderService } from '../../services';
 import { Order, OrderStatus } from '../../../shared/api-contracts';
 
-interface OrderHistoryScreenProps {
-  onSelectOrder: (orderId: string) => void;
-}
-
-export const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({
-  onSelectOrder,
-}) => {
+export const OrderHistoryScreen: React.FC = () => {
+  const navigation = useNavigation();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,7 +57,9 @@ export const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.orderCard}
-            onPress={() => onSelectOrder(item.id)}
+            onPress={() => {
+              (navigation as any).navigate('OrderTracking', { orderId: item.id });
+            }}
           >
             <View style={styles.orderHeader}>
               <Text style={styles.orderId}>Order #{item.id.slice(0, 8)}</Text>

@@ -70,12 +70,20 @@ export const UserHomeScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Restaurants</Text>
-        <TouchableOpacity
-          style={styles.routeButton}
-          onPress={handlePickOnRoute}
-        >
-          <Text style={styles.routeButtonText}>Pick on Route</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.historyButton}
+            onPress={() => (navigation as any).navigate('OrderHistory')}
+          >
+            <Text style={styles.historyButtonText}>📋 Orders</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.routeButton}
+            onPress={handlePickOnRoute}
+          >
+            <Text style={styles.routeButtonText}>Pick on Route</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {locationError && (
@@ -130,9 +138,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 20,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -142,6 +147,22 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 12,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  historyButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  historyButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   routeButton: {
     backgroundColor: '#007AFF',

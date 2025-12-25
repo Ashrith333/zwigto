@@ -76,7 +76,7 @@ export class SupabaseProvider implements OnModuleInit, OnModuleDestroy {
   async findUserById(id: string): Promise<User | null> {
     try {
       const query = `
-        SELECT id, phone, password_hash, role
+        SELECT id, phone, password_hash, role, default_pin
         FROM users
         WHERE id = $1
         LIMIT 1
@@ -103,13 +103,16 @@ export class SupabaseProvider implements OnModuleInit, OnModuleDestroy {
 
   async createUser(phone: string, role: string = 'USER'): Promise<User> {
     try {
+      // Generate a random 4-digit PIN for the user
+      const defaultPin = Math.floor(1000 + Math.random() * 9000).toString();
+      
       const query = `
-        INSERT INTO users (phone, role, password_hash)
-        VALUES ($1, $2, NULL)
-        RETURNING id, phone, password_hash, role
+        INSERT INTO users (phone, role, password_hash, default_pin)
+        VALUES ($1, $2, NULL, $3)
+        RETURNING id, phone, password_hash, role, default_pin
       `;
 
-      const result: QueryResult = await this.pool.query(query, [phone, role]);
+      const result: QueryResult = await this.pool.query(query, [phone, role, defaultPin]);
 
       if (result.rows.length === 0) {
         throw new Error('Failed to create user');
