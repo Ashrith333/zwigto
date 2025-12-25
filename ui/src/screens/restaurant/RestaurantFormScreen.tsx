@@ -1,0 +1,386 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { restaurantService } from '../../services';
+import { RestaurantProfile } from '../../../shared/api-contracts';
+
+export const RestaurantFormScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(null);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [address, setAddress] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [paymentAccount, setPaymentAccount] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadRestaurant();
+  }, []);
+
+  // Reload restaurant when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = (navigation as any).addListener('focus', () => {
+      loadRestaurant();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadRestaurant = async () => {
+    try {
+      const rest = await restaurantService.getMyRestaurant();
+      if (rest) {
+        console.log('Loaded restaurant:', {
+          id: rest.id,
+          name: rest.name,
+          status: rest.status,
+        });
+        setRestaurant(rest);
+        setName(rest.name);
+        setDescription(rest.description || '');
+        setAddress(rest.address);
+        setLatitude(rest.latitude.toString());
+        setLongitude(rest.longitude.toString());
+        setPhone(rest.phone || '');
+        setEmail(rest.email || '');
+        setPaymentAccount(rest.payment_account || '');
+      } else {
+        console.log('No restaurant found - showing empty form for creation');
+      }
+    } catch (error: any) {
+      console.error('Failed to load restaurant:', error);
+      // If no restaurant exists, that's fine - show empty form
+      // Don't show error alert - just log it
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name || !address || !latitude || !longitude) {
+      Alert.alert('Error', 'Please fill all required fields (name, address, location)');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (restaurant) {
+        // Check for any changes - all fields are now editable
+        const hasChanges = 
+          name !== restaurant.name ||
+          description !== (restaurant.description || '') ||
+          address !== restaurant.address ||
+          latitude !== restaurant.latitude.toString() ||
+          longitude !== restaurant.longitude.toString() ||
+          phone !== (restaurant.phone || '') ||
+          email !== (restaurant.email || '') ||
+          paymentAccount !== (restaurant.payment_account || '');
+
+        if (hasChanges) {
+          // Update all fields directly - status will be set to PENDING automatically
+          await restaurantService.updateRestaurant(restaurant.id, {
+            name,
+            description: description || undefined,
+            address,
+            latitude: parseFloat(latitude),
+            longitude: parseFloat(longitude),
+            phone: phone || undefined,
+            email: email || undefined,
+            payment_account: paymentAccount || undefined,
+          });
+
+          Alert.alert('Success', 'Restaurant updated. Changes require admin approval.');
+          // Reload restaurant data to reflect changes
+          await loadRestaurant();
+          (navigation as any).navigate('RestaurantHome');
+        } else {
+          Alert.alert('Info', 'No changes detected');
+        }
+      } else {
+        // Create new restaurant
+        console.log('Creating restaurant with data:', {
+          name,
+          address,
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+        });
+        const newRestaurant = await restaurantService.createRestaurant({
+          name,
+          description: description || undefined,
+          address,
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+          phone: phone || undefined,
+          email: email || undefined,
+          payment_account: paymentAccount || undefined,
+        });
+
+        console.log('✅ Restaurant created:', {
+          id: newRestaurant.id,
+          status: newRestaurant.status,
+        });
+
+        // Reload restaurant data to get the full profile
+        await loadRestaurant();
+        
+        Alert.alert(
+          'Success', 
+          'Restaurant created successfully! It will go live after admin approval. You can now add menu items.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                (navigation as any).navigate('RestaurantHome');
+              },
+            },
+          ]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to save restaurant');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>
+          {restaurant ? 'Edit Restaurant' : 'Create Restaurant'}
+        </Text>
+        {restaurant && restaurant.status === 'PENDING' && (
+          <Text style={styles.pendingText}>Pending admin approval</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Restaurant Name *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter restaurant name"
+          value={name}
+          onChangeText={setName}
+        />
+        {restaurant && restaurant.status === 'ACTIVE' && (
+          <Text style={styles.hint}>Name changes require admin approval</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Description</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Describe your restaurant..."
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          numberOfLines={4}
+        />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Address *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter full address"
+          value={address}
+          onChangeText={setAddress}
+        />
+        {restaurant && restaurant.status === 'ACTIVE' && (
+          <Text style={styles.hint}>Address changes require admin approval</Text>
+        )}
+      </View>
+
+      <View style={styles.row}>
+        <View style={styles.halfInput}>
+          <Text style={styles.label}>Latitude *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., 28.6139"
+            value={latitude}
+            onChangeText={setLatitude}
+            keyboardType="numeric"
+          />
+        </View>
+        <View style={styles.halfInput}>
+          <Text style={styles.label}>Longitude *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., 77.2090"
+            value={longitude}
+            onChangeText={setLongitude}
+            keyboardType="numeric"
+          />
+        </View>
+      </View>
+      {restaurant && restaurant.status === 'ACTIVE' && (
+        <Text style={styles.hint}>Location changes require admin approval</Text>
+      )}
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Phone</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Phone number"
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Email address"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Payment Details</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="UPI ID, QR code, or Bank account details"
+          value={paymentAccount}
+          onChangeText={setPaymentAccount}
+          multiline
+          numberOfLines={3}
+        />
+        {restaurant && restaurant.status === 'ACTIVE' && (
+          <Text style={styles.hint}>Payment details changes require admin approval</Text>
+        )}
+      </View>
+
+      <View style={styles.infoBox}>
+        <Text style={styles.infoText}>
+          {restaurant
+            ? 'Restaurant will go offline until admin approves your changes.'
+            : 'Restaurant will go live after admin approval.'}
+        </Text>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        onPress={handleSave}
+        disabled={saving}
+      >
+        <Text style={styles.saveButtonText}>
+          {saving ? 'Saving...' : restaurant ? 'Update Restaurant' : 'Create Restaurant'}
+        </Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  pendingText: {
+    fontSize: 14,
+    color: '#FF9500',
+    marginTop: 8,
+  },
+  section: {
+    backgroundColor: '#fff',
+    padding: 20,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 12,
+    borderRadius: 8,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: '#fff',
+    padding: 20,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  halfInput: {
+    flex: 1,
+  },
+  hint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  infoBox: {
+    backgroundColor: '#E3F2FD',
+    padding: 16,
+    margin: 20,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#1976D2',
+  },
+  saveButton: {
+    backgroundColor: '#34C759',
+    padding: 16,
+    margin: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.5,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+});
+
