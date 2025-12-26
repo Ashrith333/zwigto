@@ -41,6 +41,7 @@ export interface RestaurantChangeRequest {
   restaurant_id: string;
   requested_fields: Record<string, any>;
   status: ChangeRequestStatus;
+  rejection_reason: string | null;
   created_at: Date;
   updated_at: Date;
 }

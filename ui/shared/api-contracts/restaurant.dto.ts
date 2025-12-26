@@ -45,7 +45,17 @@ export interface ChangeRequest {
   restaurant_id: string;
   requested_fields: Record<string, any>;
   status: ChangeRequestStatus;
+  rejection_reason: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PendingRestaurantWithChanges {
+  restaurant: RestaurantProfile;
+  change_request?: ChangeRequest | null;
+  is_new: boolean;
+  changed_fields: string[];
+  current_values: Record<string, any>;
+  requested_values: Record<string, any>;
 }
 

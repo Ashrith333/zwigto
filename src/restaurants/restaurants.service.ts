@@ -206,12 +206,13 @@ export class RestaurantsService {
       restaurant_id: updated.restaurant_id,
       requested_fields: updated.requested_fields,
       status: updated.status,
+      rejection_reason: updated.rejection_reason,
       created_at: updated.created_at,
       updated_at: updated.updated_at,
     };
   }
 
-  async rejectChangeRequest(changeRequestId: string): Promise<ChangeRequestDto> {
+  async rejectChangeRequest(changeRequestId: string, rejectionReason?: string): Promise<ChangeRequestDto> {
     const changeRequest = await this.databaseProvider.findChangeRequestById(changeRequestId);
 
     if (!changeRequest) {
@@ -222,7 +223,7 @@ export class RestaurantsService {
       throw new BadRequestException('Change request is not pending');
     }
 
-    await this.databaseProvider.updateChangeRequestStatus(changeRequestId, 'REJECTED');
+    await this.databaseProvider.updateChangeRequestStatus(changeRequestId, 'REJECTED', rejectionReason || null);
 
     const updated = await this.databaseProvider.findChangeRequestById(changeRequestId);
 
@@ -231,6 +232,7 @@ export class RestaurantsService {
       restaurant_id: updated.restaurant_id,
       requested_fields: updated.requested_fields,
       status: updated.status,
+      rejection_reason: updated.rejection_reason,
       created_at: updated.created_at,
       updated_at: updated.updated_at,
     };
@@ -296,6 +298,7 @@ export class RestaurantsService {
       restaurant_id: cr.restaurant_id,
       requested_fields: cr.requested_fields,
       status: cr.status,
+      rejection_reason: cr.rejection_reason,
       created_at: cr.created_at,
       updated_at: cr.updated_at,
     }));

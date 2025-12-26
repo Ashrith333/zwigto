@@ -21,6 +21,7 @@ import { CheckoutScreen } from './src/screens/user/CheckoutScreen';
 import { OrderTrackingScreen } from './src/screens/user/OrderTrackingScreen';
 import { AdminHomeScreen } from './src/screens/admin/AdminHomeScreen';
 import { RestaurantApprovalsScreen } from './src/screens/admin/RestaurantApprovalsScreen';
+import { RestaurantApprovalDetailScreen } from './src/screens/admin/RestaurantApprovalDetailScreen';
 import { ChangeRequestsScreen } from './src/screens/admin/ChangeRequestsScreen';
 import { OrderOversightScreen } from './src/screens/admin/OrderOversightScreen';
 import { PaymentManagementScreen } from './src/screens/admin/PaymentManagementScreen';
@@ -125,6 +126,11 @@ export default function App() {
           name="RestaurantApprovals" 
           component={RestaurantApprovalsScreen}
           options={{ title: 'Restaurant Approvals' }}
+        />
+        <Stack.Screen 
+          name="RestaurantApprovalDetail" 
+          component={RestaurantApprovalDetailScreen}
+          options={{ title: 'Approval Details' }}
         />
         <Stack.Screen 
           name="ChangeRequests" 

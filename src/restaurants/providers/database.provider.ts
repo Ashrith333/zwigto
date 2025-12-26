@@ -370,62 +370,156 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
 
   async findAllChangeRequests(): Promise<RestaurantChangeRequest[]> {
     const query = `
-      SELECT id, restaurant_id, requested_fields, status, created_at, updated_at
+      SELECT id, restaurant_id, requested_fields, status, COALESCE(rejection_reason, NULL) as rejection_reason, created_at, updated_at
       FROM restaurant_change_requests
       ORDER BY created_at DESC
     `;
 
-    const result: QueryResult = await this.pool.query(query);
-    return result.rows as RestaurantChangeRequest[];
+    try {
+      const result: QueryResult = await this.pool.query(query);
+      return result.rows.map((row) => ({
+        ...row,
+        requested_fields: typeof row.requested_fields === 'string' 
+          ? JSON.parse(row.requested_fields) 
+          : row.requested_fields,
+        rejection_reason: row.rejection_reason || null,
+      })) as RestaurantChangeRequest[];
+    } catch (error: any) {
+      // If rejection_reason column doesn't exist, fallback
+      if (error.message && error.message.includes('rejection_reason')) {
+        const fallbackQuery = `
+          SELECT id, restaurant_id, requested_fields, status, created_at, updated_at
+          FROM restaurant_change_requests
+          ORDER BY created_at DESC
+        `;
+        const result: QueryResult = await this.pool.query(fallbackQuery);
+        return result.rows.map((row) => ({
+          ...row,
+          requested_fields: typeof row.requested_fields === 'string' 
+            ? JSON.parse(row.requested_fields) 
+            : row.requested_fields,
+          rejection_reason: null,
+        })) as RestaurantChangeRequest[];
+      }
+      throw error;
+    }
   }
 
   async findChangeRequestById(id: string): Promise<RestaurantChangeRequest | null> {
     const query = `
-      SELECT id, restaurant_id, requested_fields, status, created_at, updated_at
+      SELECT id, restaurant_id, requested_fields, status, COALESCE(rejection_reason, NULL) as rejection_reason, created_at, updated_at
       FROM restaurant_change_requests
       WHERE id = $1
       LIMIT 1
     `;
 
-    const result: QueryResult = await this.pool.query(query, [id]);
+    try {
+      const result: QueryResult = await this.pool.query(query, [id]);
 
-    if (result.rows.length === 0) {
-      return null;
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        ...row,
+        requested_fields: typeof row.requested_fields === 'string' 
+          ? JSON.parse(row.requested_fields) 
+          : row.requested_fields,
+        rejection_reason: row.rejection_reason || null,
+      } as RestaurantChangeRequest;
+    } catch (error: any) {
+      // If rejection_reason column doesn't exist, fallback
+      if (error.message && error.message.includes('rejection_reason')) {
+        const fallbackQuery = `
+          SELECT id, restaurant_id, requested_fields, status, created_at, updated_at
+          FROM restaurant_change_requests
+          WHERE id = $1
+          LIMIT 1
+        `;
+        const result: QueryResult = await this.pool.query(fallbackQuery, [id]);
+        if (result.rows.length === 0) {
+          return null;
+        }
+        const row = result.rows[0];
+        return {
+          ...row,
+          requested_fields: typeof row.requested_fields === 'string' 
+            ? JSON.parse(row.requested_fields) 
+            : row.requested_fields,
+          rejection_reason: null,
+        } as RestaurantChangeRequest;
+      }
+      throw error;
     }
-
-    const row = result.rows[0];
-    return {
-      ...row,
-      requested_fields: typeof row.requested_fields === 'string' 
-        ? JSON.parse(row.requested_fields) 
-        : row.requested_fields,
-    } as RestaurantChangeRequest;
   }
 
   async updateChangeRequestStatus(
     id: string,
     status: 'APPROVED' | 'REJECTED',
+    rejectionReason: string | null = null,
   ): Promise<RestaurantChangeRequest> {
-    const query = `
-      UPDATE restaurant_change_requests
-      SET status = $1, updated_at = NOW()
-      WHERE id = $2
-      RETURNING id, restaurant_id, requested_fields, status, created_at, updated_at
-    `;
+    let query: string;
+    let values: any[];
 
-    const result: QueryResult = await this.pool.query(query, [status, id]);
-
-    if (result.rows.length === 0) {
-      throw new Error('Change request not found');
+    if (status === 'REJECTED' && rejectionReason) {
+      // Try to update with rejection_reason
+      query = `
+        UPDATE restaurant_change_requests
+        SET status = $1, rejection_reason = $2, updated_at = NOW()
+        WHERE id = $3
+        RETURNING id, restaurant_id, requested_fields, status, COALESCE(rejection_reason, NULL) as rejection_reason, created_at, updated_at
+      `;
+      values = [status, rejectionReason, id];
+    } else {
+      query = `
+        UPDATE restaurant_change_requests
+        SET status = $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING id, restaurant_id, requested_fields, status, COALESCE(rejection_reason, NULL) as rejection_reason, created_at, updated_at
+      `;
+      values = [status, id];
     }
 
-    const row = result.rows[0];
-    return {
-      ...row,
-      requested_fields: typeof row.requested_fields === 'string' 
-        ? JSON.parse(row.requested_fields) 
-        : row.requested_fields,
-    } as RestaurantChangeRequest;
+    try {
+      const result: QueryResult = await this.pool.query(query, values);
+
+      if (result.rows.length === 0) {
+        throw new Error('Change request not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        ...row,
+        requested_fields: typeof row.requested_fields === 'string' 
+          ? JSON.parse(row.requested_fields) 
+          : row.requested_fields,
+        rejection_reason: row.rejection_reason || null,
+      } as RestaurantChangeRequest;
+    } catch (error: any) {
+      // If rejection_reason column doesn't exist, fallback to update without it
+      if (error.message && error.message.includes('rejection_reason')) {
+        const fallbackQuery = `
+          UPDATE restaurant_change_requests
+          SET status = $1, updated_at = NOW()
+          WHERE id = $2
+          RETURNING id, restaurant_id, requested_fields, status, created_at, updated_at
+        `;
+        const result: QueryResult = await this.pool.query(fallbackQuery, [status, id]);
+        if (result.rows.length === 0) {
+          throw new Error('Change request not found');
+        }
+        const row = result.rows[0];
+        return {
+          ...row,
+          requested_fields: typeof row.requested_fields === 'string' 
+            ? JSON.parse(row.requested_fields) 
+            : row.requested_fields,
+          rejection_reason: null,
+        } as RestaurantChangeRequest;
+      }
+      throw error;
+    }
   }
 
   async applyChangeRequest(restaurantId: string, fields: Record<string, any>): Promise<Restaurant> {

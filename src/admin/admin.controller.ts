@@ -38,8 +38,9 @@ export class AdminController {
   @Post('change-requests/:id/reject')
   async rejectChangeRequest(
     @Param('id') id: string,
+    @Body() dto: RejectChangeRequestDto,
   ): Promise<ChangeRequestDto> {
-    return this.adminService.rejectChangeRequest(id);
+    return this.adminService.rejectChangeRequest(id, dto.rejection_reason);
   }
 
   @Patch('restaurants/:id/pause')
@@ -80,6 +81,11 @@ export class AdminController {
   @Get('restaurants/pending')
   async getPendingRestaurants(): Promise<RestaurantProfileDto[]> {
     return this.adminService.getPendingRestaurants();
+  }
+
+  @Get('restaurants/pending-with-changes')
+  async getPendingRestaurantsWithChanges(): Promise<any[]> {
+    return this.adminService.getPendingRestaurantsWithChanges();
   }
 
   @Get('change-requests')

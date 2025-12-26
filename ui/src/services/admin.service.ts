@@ -18,10 +18,10 @@ class AdminService {
     );
   }
 
-  async rejectChangeRequest(changeRequestId: string): Promise<RejectChangeRequestResponse> {
+  async rejectChangeRequest(changeRequestId: string, rejectionReason?: string): Promise<RejectChangeRequestResponse> {
     return apiClient.post<RejectChangeRequestResponse>(
       `/admin/change-requests/${changeRequestId}/reject`,
-      {},
+      { rejection_reason: rejectionReason },
     );
   }
 
@@ -49,6 +49,10 @@ class AdminService {
 
   async getPendingRestaurants(): Promise<any[]> {
     return apiClient.get<any[]>('/admin/restaurants/pending');
+  }
+
+  async getPendingRestaurantsWithChanges(): Promise<any[]> {
+    return apiClient.get<any[]>('/admin/restaurants/pending-with-changes');
   }
 
   async getAllOrders(): Promise<any[]> {

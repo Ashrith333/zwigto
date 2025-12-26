@@ -1,4 +1,4 @@
 export class RejectChangeRequestDto {
-  change_request_id: string;
+  rejection_reason?: string;
 }
 
