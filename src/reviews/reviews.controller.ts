@@ -7,6 +7,7 @@ import {
   Body,
   Request,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -16,30 +17,45 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/interfaces/user.interface';
-import { UpdateReviewDto } from './dto/update-review.dto';
+import { RestaurantsService } from '../restaurants/restaurants.service';
 
 @Controller('reviews')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReviewsController {
-  constructor(private readonly reviewsService: ReviewsService) {}
+  constructor(
+    private readonly reviewsService: ReviewsService,
+    private readonly restaurantsService: RestaurantsService,
+  ) {}
 
   @Post()
-  @Roles(UserRole.USER)
+  @Roles(UserRole.USER, UserRole.ADMIN)
   async createReview(
     @Request() req: any,
     @Body() dto: CreateReviewDto,
   ): Promise<ReviewDto> {
-    return this.reviewsService.createReview(req.user.id, dto);
+    try {
+      console.log('Creating review for user:', req.user.id, 'order:', dto.order_id);
+      return await this.reviewsService.createReview(req.user.id, dto);
+    } catch (error: any) {
+      console.error('Error creating review:', error);
+      throw error;
+    }
   }
 
-  @Patch(':id')
-  @Roles(UserRole.USER)
-  async updateReview(
+  @Patch(':id/reply')
+  // Allow restaurant owners (regardless of role) to reply to reviews
+  async replyToReview(
     @Param('id') id: string,
     @Request() req: any,
-    @Body() dto: UpdateReviewDto,
+    @Body() body: { reply: string },
   ): Promise<ReviewDto> {
-    return this.reviewsService.updateReview(id, req.user.id, dto.rating, dto.comment || null);
+    const restaurantUser = await this.restaurantsService.getRestaurantForUser(req.user.id);
+    
+    if (!restaurantUser) {
+      throw new BadRequestException('You must own a restaurant to reply to reviews');
+    }
+
+    return this.reviewsService.replyToReview(id, restaurantUser.restaurant_id, body.reply);
   }
 
   @Get(':id')

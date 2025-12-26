@@ -110,12 +110,8 @@ export const RestaurantHomeScreen: React.FC = () => {
     (navigation as any).navigate('RestaurantForm');
   };
 
-  const handleRatings = () => {
-    (navigation as any).navigate('RestaurantRatings');
-  };
-
-  const handleOrderHistory = () => {
-    (navigation as any).navigate('RestaurantOrderHistory');
+  const handleRatingAndOrderHistory = () => {
+    (navigation as any).navigate('RatingAndOrderHistory');
   };
 
   const handleLogout = async () => {
@@ -285,14 +281,9 @@ export const RestaurantHomeScreen: React.FC = () => {
           <Text style={styles.actionButtonSubtext}>Edit all restaurant details including payment info</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionButton} onPress={handleRatings}>
-          <Text style={styles.actionButtonText}>⭐ Ratings & Feedback</Text>
-          <Text style={styles.actionButtonSubtext}>View customer reviews</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={handleOrderHistory}>
-          <Text style={styles.actionButtonText}>📋 Order History</Text>
-          <Text style={styles.actionButtonSubtext}>View past orders</Text>
+        <TouchableOpacity style={styles.actionButton} onPress={handleRatingAndOrderHistory}>
+          <Text style={styles.actionButtonText}>⭐ Rating and Order History</Text>
+          <Text style={styles.actionButtonSubtext}>View ratings, reviews, and order history</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

@@ -41,6 +41,12 @@ export interface Order {
   pickup_time: string | null;
   estimated_ready_time?: string; // ETA based on prep time
   items?: OrderItem[]; // Order items
+  review?: {
+    id: string;
+    rating: number;
+    comment: string | null;
+    restaurant_reply: string | null;
+  }; // Review information if order has been reviewed
   created_at: string;
   updated_at: string;
 }

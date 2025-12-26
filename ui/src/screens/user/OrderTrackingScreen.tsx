@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { orderService, userService } from '../../services';
+import { orderService, userService, reviewService } from '../../services';
 import { Order, OrderStatus } from '../../../shared/api-contracts';
 
 export const OrderTrackingScreen: React.FC = () => {
@@ -13,6 +13,10 @@ export const OrderTrackingScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userPin, setUserPin] = useState<string | null>(null);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadUserPin();
@@ -44,6 +48,52 @@ export const OrderTrackingScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const handleRateOrder = () => {
+    setRating(0);
+    setComment('');
+    setRatingModalVisible(true);
+  };
+
+  const handleSubmitRating = async () => {
+    if (!order || rating === 0) {
+      Alert.alert('Error', 'Please select a rating');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await reviewService.createReview({
+        order_id: order.id,
+        rating,
+        comment: comment.trim() || undefined,
+      });
+      Alert.alert('Success', 'Thank you for your review!');
+      setRatingModalVisible(false);
+      loadOrder(); // Reload to show the review
+    } catch (error: any) {
+      Alert.alert('Error', error?.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const renderStars = (ratingValue: number, interactive: boolean = false, onPress?: (value: number) => void) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <TouchableOpacity
+          key={i}
+          disabled={!interactive}
+          onPress={() => onPress && onPress(i)}
+          style={styles.starButton}
+        >
+          <Text style={styles.star}>{i <= ratingValue ? '⭐' : '☆'}</Text>
+        </TouchableOpacity>
+      );
+    }
+    return <View style={styles.starsRow}>{stars}</View>;
   };
 
   const loadMyOrders = async () => {
@@ -181,11 +231,107 @@ export const OrderTrackingScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Rating Section for Picked Up Orders */}
+      {order.status === OrderStatus.PICKED_UP && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Review & Rating</Text>
+          {order.review ? (
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewLabel}>Your Review:</Text>
+              {renderStars(order.review.rating)}
+              {order.review.comment && (
+                <Text style={styles.reviewComment}>{order.review.comment}</Text>
+              )}
+              {order.review.restaurant_reply && (
+                <View style={styles.replyContainer}>
+                  <Text style={styles.replyLabel}>Restaurant Reply:</Text>
+                  <Text style={styles.replyText}>{order.review.restaurant_reply}</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.rateButton}
+              onPress={handleRateOrder}
+            >
+              <Text style={styles.rateButtonText}>Rate this Order</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       <FlatList
         data={[]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={null}
       />
+
+      {/* Rating Modal */}
+      <Modal
+        visible={ratingModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setRatingModalVisible(false);
+        }}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <ScrollView
+                contentContainerStyle={styles.modalScrollContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Rate Your Order</Text>
+                  <Text style={styles.modalSubtitle}>Order #{order?.id.slice(0, 8)}</Text>
+                  
+                  <Text style={styles.ratingLabel}>Rating:</Text>
+                  {renderStars(rating, true, setRating)}
+                  
+                  <Text style={styles.commentLabel}>Feedback (optional):</Text>
+                  <TextInput
+                    style={styles.commentInput}
+                    multiline
+                    numberOfLines={4}
+                    placeholder="Share your experience..."
+                    value={comment}
+                    onChangeText={setComment}
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                  />
+                  
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.cancelButton]}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setRatingModalVisible(false);
+                      }}
+                      disabled={submitting}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.submitButton, rating === 0 && styles.submitButtonDisabled]}
+                      onPress={handleSubmitRating}
+                      disabled={submitting || rating === 0}
+                    >
+                      <Text style={styles.submitButtonText}>
+                        {submitting ? 'Submitting...' : 'Submit'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </ScrollView>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 
@@ -339,6 +485,145 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  reviewCard: {
+    backgroundColor: '#f9f9f9',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  reviewLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
+  },
+  starsRow: {
+    flexDirection: 'row',
+    marginVertical: 8,
+  },
+  starButton: {
+    marginHorizontal: 4,
+  },
+  star: {
+    fontSize: 28,
+  },
+  reviewComment: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  replyContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 8,
+  },
+  replyLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2E7D32',
+    marginBottom: 6,
+  },
+  replyText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  rateButton: {
+    backgroundColor: '#2196F3',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  rateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '90%',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  ratingLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  commentLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    fontSize: 14,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#e0e0e0',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  submitButton: {
+    backgroundColor: '#2196F3',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
 

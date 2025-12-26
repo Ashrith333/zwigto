@@ -2,6 +2,7 @@ import { apiClient } from './api-client';
 import {
   CreateReviewRequest,
   UpdateReviewRequest,
+  ReplyReviewRequest,
   Review,
   RestaurantRating,
 } from '../../shared/api-contracts';
@@ -13,6 +14,10 @@ class ReviewService {
 
   async updateReview(reviewId: string, request: UpdateReviewRequest): Promise<Review> {
     return apiClient.patch<Review>(`/reviews/${reviewId}`, request);
+  }
+
+  async replyToReview(reviewId: string, request: ReplyReviewRequest): Promise<Review> {
+    return apiClient.patch<Review>(`/reviews/${reviewId}/reply`, request);
   }
 
   async getReview(reviewId: string): Promise<Review> {

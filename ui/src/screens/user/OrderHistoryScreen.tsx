@@ -13,6 +13,7 @@ export const OrderHistoryScreen: React.FC = () => {
   const loadOrders = async () => {
     setLoading(true);
     try {
+      // getMyOrders already includes review information for PICKED_UP orders
       const myOrders = await orderService.getMyOrders();
       setOrders(myOrders);
     } catch (error) {
@@ -45,6 +46,7 @@ export const OrderHistoryScreen: React.FC = () => {
     }
   };
 
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Order History</Text>
@@ -55,28 +57,29 @@ export const OrderHistoryScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.orderCard}
-            onPress={() => {
-              (navigation as any).navigate('OrderTracking', { orderId: item.id });
-            }}
-          >
-            <View style={styles.orderHeader}>
-              <Text style={styles.orderId}>Order #{item.id.slice(0, 8)}</Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: getStatusColor(item.status) },
-                ]}
-              >
-                <Text style={styles.statusText}>{item.status}</Text>
+          <View style={styles.orderCard}>
+            <TouchableOpacity
+              onPress={() => {
+                (navigation as any).navigate('OrderTracking', { orderId: item.id });
+              }}
+            >
+              <View style={styles.orderHeader}>
+                <Text style={styles.orderId}>Order #{item.id.slice(0, 8)}</Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: getStatusColor(item.status) },
+                  ]}
+                >
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
               </View>
-            </View>
-            <Text style={styles.orderAmount}>₹{item.total_amount}</Text>
-            <Text style={styles.orderDate}>
-              {new Date(item.created_at).toLocaleDateString()}
-            </Text>
-          </TouchableOpacity>
+              <Text style={styles.orderAmount}>₹{item.total_amount}</Text>
+              <Text style={styles.orderDate}>
+                {new Date(item.created_at).toLocaleDateString()}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
         ListEmptyComponent={
           !loading && <Text style={styles.emptyText}>No orders yet</Text>

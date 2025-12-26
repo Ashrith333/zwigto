@@ -14,8 +14,8 @@ import { OrderManagementScreen } from './src/screens/restaurant/OrderManagementS
 import { MenuManagementScreen } from './src/screens/restaurant/MenuManagementScreen';
 import { RestaurantProfileScreen } from './src/screens/restaurant/RestaurantProfileScreen';
 import { PaymentDetailsScreen } from './src/screens/restaurant/PaymentDetailsScreen';
-import { RestaurantRatingsScreen } from './src/screens/restaurant/RestaurantRatingsScreen';
-import { RestaurantOrderHistoryScreen } from './src/screens/restaurant/RestaurantOrderHistoryScreen';
+import { RatingAndOrderHistoryScreen } from './src/screens/restaurant/RatingAndOrderHistoryScreen';
+import { RestaurantOrderDetailScreen } from './src/screens/restaurant/RestaurantOrderDetailScreen';
 import { RestaurantMenuScreen } from './src/screens/user/RestaurantMenuScreen';
 import { CheckoutScreen } from './src/screens/user/CheckoutScreen';
 import { OrderTrackingScreen } from './src/screens/user/OrderTrackingScreen';
@@ -92,14 +92,14 @@ export default function App() {
           options={{ title: 'Payment Details' }}
         />
         <Stack.Screen 
-          name="RestaurantRatings" 
-          component={RestaurantRatingsScreen}
-          options={{ title: 'Ratings & Feedback' }}
+          name="RatingAndOrderHistory" 
+          component={RatingAndOrderHistoryScreen}
+          options={{ title: 'Rating and Order History' }}
         />
         <Stack.Screen 
-          name="RestaurantOrderHistory" 
-          component={RestaurantOrderHistoryScreen}
-          options={{ title: 'Order History' }}
+          name="RestaurantOrderDetail" 
+          component={RestaurantOrderDetailScreen}
+          options={{ title: 'Order Details' }}
         />
         <Stack.Screen 
           name="RestaurantMenu" 

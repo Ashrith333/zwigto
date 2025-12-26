@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { DatabaseProvider } from './providers/database.provider';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -15,6 +17,7 @@ import {
 } from './interfaces/order.interface';
 import { MenusService } from '../menus/menus.service';
 import { UsersService } from '../users/users.service';
+import { ReviewsService } from '../reviews/reviews.service';
 
 @Injectable()
 export class OrdersService {
@@ -22,6 +25,8 @@ export class OrdersService {
     private readonly databaseProvider: DatabaseProvider,
     private readonly menusService: MenusService,
     private readonly usersService: UsersService,
+    @Inject(forwardRef(() => ReviewsService))
+    private readonly reviewsService: ReviewsService,
   ) {}
 
   async createOrder(userId: string, dto: CreateOrderDto): Promise<OrderDto> {
@@ -266,6 +271,24 @@ export class OrdersService {
         console.error(`Error fetching order items for order ${order.id}:`, error);
         // Don't fail the entire request if items can't be fetched, just log it
         dto.items = [];
+      }
+    }
+
+    // Fetch review information if order is PICKED_UP
+    if (order.status === OrderStatus.PICKED_UP) {
+      try {
+        const review = await this.reviewsService.getReviewByOrderId(order.id);
+        if (review) {
+          dto.review = {
+            id: review.id,
+            rating: review.rating,
+            comment: review.comment,
+            restaurant_reply: review.restaurant_reply,
+          };
+        }
+      } catch (error: any) {
+        // Don't fail if review can't be fetched
+        console.warn(`Error fetching review for order ${order.id}:`, error);
       }
     }
 

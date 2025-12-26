@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { DatabaseProvider } from './providers/database.provider';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -18,6 +20,7 @@ export class ReviewsService {
 
   constructor(
     private readonly databaseProvider: DatabaseProvider,
+    @Inject(forwardRef(() => OrdersService))
     private readonly ordersService: OrdersService,
   ) {}
 
@@ -57,11 +60,13 @@ export class ReviewsService {
     return this.mapToDto(review);
   }
 
-  async updateReview(
+  // Reviews are no longer editable once created
+  // async updateReview(...) - REMOVED
+
+  async replyToReview(
     reviewId: string,
-    userId: string,
-    rating: number,
-    comment: string | null,
+    restaurantId: string,
+    reply: string,
   ): Promise<ReviewDto> {
     const review = await this.databaseProvider.findReviewById(reviewId);
 
@@ -69,26 +74,15 @@ export class ReviewsService {
       throw new NotFoundException('Review not found');
     }
 
-    if (review.user_id !== userId) {
-      throw new ForbiddenException('You can only edit your own reviews');
+    if (review.restaurant_id !== restaurantId) {
+      throw new ForbiddenException('You can only reply to reviews for your restaurant');
     }
 
-    const canEdit = await this.databaseProvider.canEditReview(
-      reviewId,
-      this.EDIT_WINDOW_HOURS,
-    );
-
-    if (!canEdit) {
-      throw new BadRequestException(
-        `Review can only be edited within ${this.EDIT_WINDOW_HOURS} hours of creation`,
-      );
+    if (!reply || reply.trim().length === 0) {
+      throw new BadRequestException('Reply cannot be empty');
     }
 
-    if (rating < 1 || rating > 5) {
-      throw new BadRequestException('Rating must be between 1 and 5');
-    }
-
-    const updated = await this.databaseProvider.updateReview(reviewId, rating, comment);
+    const updated = await this.databaseProvider.replyToReview(reviewId, restaurantId, reply.trim());
 
     return this.mapToDto(updated);
   }
@@ -98,6 +92,16 @@ export class ReviewsService {
 
     if (!review) {
       throw new NotFoundException('Review not found');
+    }
+
+    return this.mapToDto(review);
+  }
+
+  async getReviewByOrderId(orderId: string): Promise<ReviewDto | null> {
+    const review = await this.databaseProvider.findReviewByOrderId(orderId);
+
+    if (!review) {
+      return null;
     }
 
     return this.mapToDto(review);
@@ -134,6 +138,7 @@ export class ReviewsService {
       restaurant_id: review.restaurant_id,
       rating: review.rating,
       comment: review.comment,
+      restaurant_reply: review.restaurant_reply,
       created_at: review.created_at,
       updated_at: review.updated_at,
     };
