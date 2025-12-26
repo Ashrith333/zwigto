@@ -16,7 +16,6 @@ export const RestaurantProfileScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [gettingLocation, setGettingLocation] = useState(false);
 
   useEffect(() => {
     loadRestaurant();
@@ -39,21 +38,32 @@ export const RestaurantProfileScreen: React.FC = () => {
     }
   };
 
-  // Handle location selection from MapPicker
+  // Handle navigation params when returning from MapPicker
   useEffect(() => {
     const unsubscribe = (navigation as any).addListener('focus', () => {
-      loadRestaurant();
-      // Check if we're returning from MapPicker with selected location
+      // Check for params from MapPicker first, before loading restaurant
       const state = (navigation as any).getState();
       const currentRoute = state?.routes?.[state.index];
+      
       if (currentRoute?.params?.selectedLatitude && currentRoute?.params?.selectedLongitude) {
+        // Update address and location from map picker
         setLatitude(currentRoute.params.selectedLatitude.toString());
         setLongitude(currentRoute.params.selectedLongitude.toString());
         if (currentRoute.params.selectedAddress) {
           setAddress(currentRoute.params.selectedAddress);
         }
+        // Clear params after using them
+        (navigation as any).setParams({
+          selectedLatitude: undefined,
+          selectedLongitude: undefined,
+          selectedAddress: undefined,
+        });
+      } else {
+        // Only reload restaurant if no new params (to avoid overwriting map selection)
+        loadRestaurant();
       }
     });
+    
     return unsubscribe;
   }, [navigation]);
 
@@ -227,29 +237,33 @@ export const RestaurantProfileScreen: React.FC = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Address *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter full address"
-          value={address}
-          onChangeText={setAddress}
-        />
-        <Text style={styles.hint}>Address changes require admin approval</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Location *</Text>
+        <Text style={styles.sectionTitle}>Address & Location *</Text>
+        {address && address.trim() ? (
+          <View style={styles.selectedAddressContainer}>
+            <Text style={styles.selectedAddressLabel}>Selected Address:</Text>
+            <Text style={styles.selectedAddressText}>{address}</Text>
+            <Text style={styles.locationInfoText}>
+              Lat: {latitude || 'Not set'} | Lon: {longitude || 'Not set'}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.hint}>No address selected. Please pick a location using the buttons below.</Text>
+        )}
         <View style={styles.locationButtonsRow}>
           <TouchableOpacity
-            style={[styles.locationButton, gettingLocation && styles.locationButtonDisabled]}
-            onPress={getCurrentLocation}
-            disabled={gettingLocation}
+            style={styles.locationButton}
+            onPress={() => {
+              const currentLat = latitude ? parseFloat(latitude) : undefined;
+              const currentLon = longitude ? parseFloat(longitude) : undefined;
+              (navigation as any).navigate('MapPicker', {
+                initialLat: currentLat,
+                initialLon: currentLon,
+                initialAddress: address,
+                useCurrentLocation: true,
+              });
+            }}
           >
-            {gettingLocation ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.locationButtonText}>📍 Get Current Location</Text>
-            )}
+            <Text style={styles.locationButtonText}>📍 Pick Current Location</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.locationButton}
@@ -258,29 +272,10 @@ export const RestaurantProfileScreen: React.FC = () => {
             <Text style={styles.locationButtonText}>🗺️ Pick on Map</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.row}>
-          <View style={styles.halfInput}>
-            <Text style={styles.label}>Latitude *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., 28.6139"
-              value={latitude}
-              onChangeText={setLatitude}
-              keyboardType="numeric"
-            />
-          </View>
-          <View style={styles.halfInput}>
-            <Text style={styles.label}>Longitude *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., 77.2090"
-              value={longitude}
-              onChangeText={setLongitude}
-              keyboardType="numeric"
-            />
-          </View>
-        </View>
-        <Text style={styles.hint}>Location changes require admin approval</Text>
+        <Text style={styles.hint}>
+          Click either button to open the map and select your restaurant location. Address will be confirmed from the map.
+        </Text>
+        <Text style={styles.hint}>Address and location changes require admin approval</Text>
       </View>
 
       <View style={styles.section}>
@@ -410,6 +405,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginBottom: 8,
   },
+  addressInput: {
+    marginBottom: 12,
+  },
+  locationInfo: {
+    backgroundColor: '#f5f5f5',
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  locationInfoText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'monospace',
+  },
   textArea: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -492,6 +502,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     color: '#333',
+  },
+  selectedAddressContainer: {
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedAddressLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+    fontWeight: '600',
+  },
+  selectedAddressText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  locationInfoText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'monospace',
   },
 });
 

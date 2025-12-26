@@ -177,6 +177,7 @@ export class RestaurantsService {
       restaurant_id: changeRequest.restaurant_id,
       requested_fields: changeRequest.requested_fields,
       status: changeRequest.status,
+      rejection_reason: changeRequest.rejection_reason,
       created_at: changeRequest.created_at,
       updated_at: changeRequest.updated_at,
     };

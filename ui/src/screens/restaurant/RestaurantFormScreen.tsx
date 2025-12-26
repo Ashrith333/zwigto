@@ -18,89 +18,48 @@ export const RestaurantFormScreen: React.FC = () => {
   const [paymentAccount, setPaymentAccount] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [gettingLocation, setGettingLocation] = useState(false);
-  const [showMapPicker, setShowMapPicker] = useState(false);
 
   useEffect(() => {
     loadRestaurant();
   }, []);
 
-  // Reload restaurant when screen comes into focus
+  // Handle navigation params when returning from MapPicker
   useEffect(() => {
     const unsubscribe = (navigation as any).addListener('focus', () => {
-      loadRestaurant();
-      // Check if we're returning from MapPicker with selected location
+      // Check for params from MapPicker first, before loading restaurant
       const state = (navigation as any).getState();
       const currentRoute = state?.routes?.[state.index];
+      
       if (currentRoute?.params?.selectedLatitude && currentRoute?.params?.selectedLongitude) {
+        // Update address and location from map picker
+        console.log('Updating from MapPicker params:', {
+          latitude: currentRoute.params.selectedLatitude,
+          longitude: currentRoute.params.selectedLongitude,
+          address: currentRoute.params.selectedAddress,
+        });
         setLatitude(currentRoute.params.selectedLatitude.toString());
         setLongitude(currentRoute.params.selectedLongitude.toString());
         if (currentRoute.params.selectedAddress) {
           setAddress(currentRoute.params.selectedAddress);
+          console.log('Address set to:', currentRoute.params.selectedAddress);
         }
+        // Clear params after using them
+        (navigation as any).setParams({
+          selectedLatitude: undefined,
+          selectedLongitude: undefined,
+          selectedAddress: undefined,
+        });
+      } else {
+        // Only reload restaurant if no new params (to avoid overwriting map selection)
+        loadRestaurant();
       }
     });
+    
     return unsubscribe;
   }, [navigation]);
 
-  // Auto-populate location if creating new restaurant (only once)
-  useEffect(() => {
-    if (!restaurant && !latitude && !longitude) {
-      getCurrentLocation();
-    }
-  }, [restaurant]);
-
-  const getCurrentLocation = async () => {
-    setGettingLocation(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Denied',
-          'Location permission is required to auto-fill your restaurant location. You can enter it manually.',
-        );
-        setGettingLocation(false);
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      setLatitude(location.coords.latitude.toFixed(6));
-      setLongitude(location.coords.longitude.toFixed(6));
-
-      // Try to reverse geocode to get address if address is empty
-      if (!address) {
-        try {
-          const addresses = await Location.reverseGeocodeAsync({
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          });
-          if (addresses.length > 0) {
-            const addr = addresses[0];
-            const addressParts = [
-              addr.street,
-              addr.name,
-              addr.district,
-              addr.city,
-              addr.region,
-              addr.postalCode,
-            ].filter(Boolean);
-            if (addressParts.length > 0) {
-              setAddress(addressParts.join(', '));
-            }
-          }
-        } catch (geocodeError) {
-          console.warn('Failed to reverse geocode:', geocodeError);
-        }
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to get current location');
-    } finally {
-      setGettingLocation(false);
-    }
-  };
+  // Removed auto-populate - user must explicitly pick location from map
+  // Removed getCurrentLocation - now handled by MapPickerScreen
 
   const handlePickOnMap = () => {
     const currentLat = latitude ? parseFloat(latitude) : undefined;
@@ -123,9 +82,9 @@ export const RestaurantFormScreen: React.FC = () => {
         setRestaurant(rest);
         setName(rest.name);
         setDescription(rest.description || '');
-        setAddress(rest.address);
-        setLatitude(rest.latitude.toString());
-        setLongitude(rest.longitude.toString());
+        setAddress(rest.address || '');
+        setLatitude(rest.latitude?.toString() || '');
+        setLongitude(rest.longitude?.toString() || '');
         setPhone(rest.phone || '');
         setEmail(rest.email || '');
         setPaymentAccount(rest.payment_account || '');
@@ -177,7 +136,8 @@ export const RestaurantFormScreen: React.FC = () => {
           Alert.alert('Success', 'Restaurant updated. Changes require admin approval.');
           // Reload restaurant data to reflect changes
           await loadRestaurant();
-          (navigation as any).navigate('RestaurantHome');
+          // Navigate back to form to show updated address
+          (navigation as any).goBack();
         } else {
           Alert.alert('Info', 'No changes detected');
         }
@@ -273,31 +233,33 @@ export const RestaurantFormScreen: React.FC = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Address *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter full address"
-          value={address}
-          onChangeText={setAddress}
-        />
-        {restaurant && restaurant.status === 'ACTIVE' && (
-          <Text style={styles.hint}>Address changes require admin approval</Text>
+        <Text style={styles.label}>Address & Location *</Text>
+        {address && address.trim() ? (
+          <View style={styles.selectedAddressContainer}>
+            <Text style={styles.selectedAddressLabel}>Selected Address:</Text>
+            <Text style={styles.selectedAddressText}>{address}</Text>
+            <Text style={styles.locationInfoText}>
+              Lat: {latitude || 'Not set'} | Lon: {longitude || 'Not set'}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.hint}>No address selected. Please pick a location using the buttons below.</Text>
         )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Location *</Text>
         <View style={styles.locationButtonsRow}>
           <TouchableOpacity
-            style={[styles.locationButton, gettingLocation && styles.locationButtonDisabled]}
-            onPress={getCurrentLocation}
-            disabled={gettingLocation}
+            style={styles.locationButton}
+            onPress={() => {
+              const currentLat = latitude ? parseFloat(latitude) : undefined;
+              const currentLon = longitude ? parseFloat(longitude) : undefined;
+              (navigation as any).navigate('MapPicker', {
+                initialLat: currentLat,
+                initialLon: currentLon,
+                initialAddress: address,
+                useCurrentLocation: true,
+              });
+            }}
           >
-            {gettingLocation ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.locationButtonText}>📍 Get Current Location</Text>
-            )}
+            <Text style={styles.locationButtonText}>📍 Pick Current Location</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.locationButton}
@@ -307,10 +269,10 @@ export const RestaurantFormScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         <Text style={styles.hint}>
-          Location will be set automatically when you use the buttons above or pick on map.
+          Click either button to open the map and select your restaurant location. Address will be confirmed from the map.
         </Text>
         {restaurant && restaurant.status === 'ACTIVE' && (
-          <Text style={styles.hint}>Location changes require admin approval</Text>
+          <Text style={styles.hint}>Address and location changes require admin approval</Text>
         )}
       </View>
 
@@ -416,6 +378,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
   },
+  addressInput: {
+    marginBottom: 12,
+  },
+  locationInfo: {
+    backgroundColor: '#f5f5f5',
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  locationInfoText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'monospace',
+  },
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
@@ -487,6 +464,31 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  selectedAddressContainer: {
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedAddressLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+    fontWeight: '600',
+  },
+  selectedAddressText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  locationInfoText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'monospace',
   },
 });
 

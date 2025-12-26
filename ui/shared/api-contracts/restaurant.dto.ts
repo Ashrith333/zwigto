@@ -12,9 +12,14 @@ export interface CreateRestaurantRequest {
 }
 
 export interface UpdateRestaurantRequest {
+  name?: string;
   description?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
   phone?: string;
   email?: string;
+  payment_account?: string;
 }
 
 export interface SubmitChangeRequestRequest {
