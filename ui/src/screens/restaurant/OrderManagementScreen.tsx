@@ -17,13 +17,24 @@ export const OrderManagementScreen: React.FC = () => {
     setLoading(true);
     try {
       const restaurant = await restaurantService.getMyRestaurant();
+      if (!restaurant) {
+        console.log('No restaurant found for user');
+        setOrders([]);
+        return;
+      }
+      
+      console.log('Loading orders for restaurant:', restaurant.id);
       setRestaurantId(restaurant.id);
       
       const restaurantOrders = await orderService.getRestaurantOrders();
+      console.log('Received orders from API:', restaurantOrders.length);
+      
       // Filter to show pending, confirmed, preparing, ready orders (not picked up or cancelled)
       const activeOrders = restaurantOrders.filter(
         (order) => order.status !== OrderStatus.PICKED_UP && order.status !== OrderStatus.CANCELLED
       );
+      console.log('Active orders after filtering:', activeOrders.length);
+      
       // Sort by created_at descending (newest first)
       const sortedOrders = activeOrders.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -31,10 +42,12 @@ export const OrderManagementScreen: React.FC = () => {
       setOrders(sortedOrders);
     } catch (error: any) {
       console.error('Failed to load orders:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       const errorMessage = error?.message || 'Failed to load orders';
       if (!errorMessage.includes('not linked')) {
         Alert.alert('Error', errorMessage);
       }
+      setOrders([]);
     } finally {
       setLoading(false);
     }

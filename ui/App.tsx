@@ -9,6 +9,7 @@ import { RouteSearchScreen } from './src/screens/user/RouteSearchScreen';
 import { OrderHistoryScreen } from './src/screens/user/OrderHistoryScreen';
 import { RestaurantHomeScreen } from './src/screens/restaurant/RestaurantHomeScreen';
 import { RestaurantFormScreen } from './src/screens/restaurant/RestaurantFormScreen';
+import { MapPickerScreen } from './src/screens/restaurant/MapPickerScreen';
 import { OrderManagementScreen } from './src/screens/restaurant/OrderManagementScreen';
 import { MenuManagementScreen } from './src/screens/restaurant/MenuManagementScreen';
 import { RestaurantProfileScreen } from './src/screens/restaurant/RestaurantProfileScreen';
@@ -64,6 +65,11 @@ export default function App() {
           name="RestaurantForm" 
           component={RestaurantFormScreen}
           options={{ title: 'Restaurant Details' }}
+        />
+        <Stack.Screen 
+          name="MapPicker" 
+          component={MapPickerScreen}
+          options={{ title: 'Pick Location' }}
         />
         <Stack.Screen 
           name="OrderManagement" 

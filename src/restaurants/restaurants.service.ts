@@ -316,6 +316,8 @@ export class RestaurantsService {
       rejection_reason: restaurant.rejection_reason || null,
       created_at: restaurant.created_at,
       updated_at: restaurant.updated_at,
+      rating: restaurant.average_rating ? parseFloat(restaurant.average_rating.toString()) : undefined,
+      avg_prep_time_minutes: restaurant.avg_prep_time_minutes ? parseInt(restaurant.avg_prep_time_minutes.toString(), 10) : undefined,
     };
   }
 }

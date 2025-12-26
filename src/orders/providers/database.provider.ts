@@ -207,7 +207,6 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       status: row.status as OrderStatus,
       total_amount: parseFloat(row.total_amount),
       payment_id: row.payment_id,
-      collection_pin: row.collection_pin,
       route_polyline:
         typeof row.route_polyline === 'string'
           ? JSON.parse(row.route_polyline)

@@ -98,11 +98,35 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
 
   async findAllRestaurants(): Promise<Restaurant[]> {
     const query = `
-      SELECT id, name, description, address, latitude, longitude,
-             phone, email, payment_account, status, rejection_reason, created_at, updated_at
-      FROM restaurants
-      WHERE status = 'ACTIVE'
-      ORDER BY created_at DESC
+      SELECT 
+        r.id, 
+        r.name, 
+        r.description, 
+        r.address, 
+        r.latitude, 
+        r.longitude,
+        r.phone, 
+        r.email, 
+        r.payment_account, 
+        r.status, 
+        r.rejection_reason, 
+        r.created_at, 
+        r.updated_at,
+        COALESCE(
+          (SELECT ROUND(AVG(rating)::numeric, 1) 
+           FROM reviews 
+           WHERE restaurant_id = r.id), 
+          0
+        ) AS average_rating,
+        COALESCE(
+          (SELECT ROUND(AVG(prep_time_minutes)::numeric, 0) 
+           FROM menu_items 
+           WHERE restaurant_id = r.id AND is_available = true), 
+          0
+        ) AS avg_prep_time_minutes
+      FROM restaurants r
+      WHERE r.status = 'ACTIVE'
+      ORDER BY r.created_at DESC
     `;
 
     const result: QueryResult = await this.pool.query(query);
@@ -124,10 +148,34 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
 
   async findRestaurantById(id: string): Promise<Restaurant | null> {
     const query = `
-      SELECT id, name, description, address, latitude, longitude,
-             phone, email, payment_account, status, rejection_reason, created_at, updated_at
-      FROM restaurants
-      WHERE id = $1
+      SELECT 
+        r.id, 
+        r.name, 
+        r.description, 
+        r.address, 
+        r.latitude, 
+        r.longitude,
+        r.phone, 
+        r.email, 
+        r.payment_account, 
+        r.status, 
+        r.rejection_reason, 
+        r.created_at, 
+        r.updated_at,
+        COALESCE(
+          (SELECT ROUND(AVG(rating)::numeric, 1) 
+           FROM reviews 
+           WHERE restaurant_id = r.id), 
+          0
+        ) AS average_rating,
+        COALESCE(
+          (SELECT ROUND(AVG(prep_time_minutes)::numeric, 0) 
+           FROM menu_items 
+           WHERE restaurant_id = r.id AND is_available = true), 
+          0
+        ) AS avg_prep_time_minutes
+      FROM restaurants r
+      WHERE r.id = $1
       LIMIT 1
     `;
 

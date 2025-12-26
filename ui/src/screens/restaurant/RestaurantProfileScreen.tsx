@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import { restaurantService } from '../../services';
 import { RestaurantProfile } from '../../../shared/api-contracts';
 
 export const RestaurantProfileScreen: React.FC = () => {
+  const navigation = useNavigation();
   const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(null);
   const [description, setDescription] = useState('');
+  const [address, setAddress] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
 
   useEffect(() => {
     loadRestaurant();
@@ -20,6 +27,9 @@ export const RestaurantProfileScreen: React.FC = () => {
       const rest = await restaurantService.getMyRestaurant();
       setRestaurant(rest);
       setDescription(rest.description || '');
+      setAddress(rest.address || '');
+      setLatitude(rest.latitude?.toString() || '');
+      setLongitude(rest.longitude?.toString() || '');
       setPhone(rest.phone || '');
       setEmail(rest.email || '');
     } catch (error) {
@@ -29,20 +39,107 @@ export const RestaurantProfileScreen: React.FC = () => {
     }
   };
 
+  // Handle location selection from MapPicker
+  useEffect(() => {
+    const unsubscribe = (navigation as any).addListener('focus', () => {
+      loadRestaurant();
+      // Check if we're returning from MapPicker with selected location
+      const state = (navigation as any).getState();
+      const currentRoute = state?.routes?.[state.index];
+      if (currentRoute?.params?.selectedLatitude && currentRoute?.params?.selectedLongitude) {
+        setLatitude(currentRoute.params.selectedLatitude.toString());
+        setLongitude(currentRoute.params.selectedLongitude.toString());
+        if (currentRoute.params.selectedAddress) {
+          setAddress(currentRoute.params.selectedAddress);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const getCurrentLocation = async () => {
+    setGettingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Location permission is required to auto-fill your restaurant location. You can enter it manually.',
+        );
+        setGettingLocation(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      setLatitude(location.coords.latitude.toFixed(6));
+      setLongitude(location.coords.longitude.toFixed(6));
+
+      // Try to reverse geocode to get address if address is empty
+      if (!address) {
+        try {
+          const addresses = await Location.reverseGeocodeAsync({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+          if (addresses.length > 0) {
+            const addr = addresses[0];
+            const addressParts = [
+              addr.street,
+              addr.name,
+              addr.district,
+              addr.city,
+              addr.region,
+              addr.postalCode,
+            ].filter(Boolean);
+            if (addressParts.length > 0) {
+              setAddress(addressParts.join(', '));
+            }
+          }
+        } catch (geocodeError) {
+          console.warn('Failed to reverse geocode:', geocodeError);
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to get current location');
+    } finally {
+      setGettingLocation(false);
+    }
+  };
+
+  const handlePickOnMap = () => {
+    const currentLat = latitude ? parseFloat(latitude) : undefined;
+    const currentLon = longitude ? parseFloat(longitude) : undefined;
+    (navigation as any).navigate('MapPicker', {
+      initialLat: currentLat,
+      initialLon: currentLon,
+    });
+  };
+
   const handleSave = async () => {
     if (!restaurant) return;
+
+    if (!address || !latitude || !longitude) {
+      Alert.alert('Error', 'Please fill all required fields (address, location)');
+      return;
+    }
 
     setSaving(true);
     try {
       await restaurantService.updateRestaurant(restaurant.id, {
-        description,
+        description: description || undefined,
+        address,
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
         phone: phone || undefined,
         email: email || undefined,
       });
-      Alert.alert('Success', 'Profile updated successfully');
+      Alert.alert('Success', 'Profile updated successfully. Changes require admin approval.');
       loadRestaurant();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update profile');
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
@@ -130,16 +227,59 @@ export const RestaurantProfileScreen: React.FC = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Address</Text>
-        <View style={styles.readOnlyField}>
-          <Text style={styles.readOnlyText}>{restaurant.address}</Text>
+        <Text style={styles.sectionTitle}>Address *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter full address"
+          value={address}
+          onChangeText={setAddress}
+        />
+        <Text style={styles.hint}>Address changes require admin approval</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Location *</Text>
+        <View style={styles.locationButtonsRow}>
+          <TouchableOpacity
+            style={[styles.locationButton, gettingLocation && styles.locationButtonDisabled]}
+            onPress={getCurrentLocation}
+            disabled={gettingLocation}
+          >
+            {gettingLocation ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.locationButtonText}>📍 Get Current Location</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.locationButton}
+            onPress={handlePickOnMap}
+          >
+            <Text style={styles.locationButtonText}>🗺️ Pick on Map</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.changeRequestButton}
-          onPress={handleRequestLocationChange}
-        >
-          <Text style={styles.changeRequestText}>Request Location Change</Text>
-        </TouchableOpacity>
+        <View style={styles.row}>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Latitude *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., 28.6139"
+              value={latitude}
+              onChangeText={setLatitude}
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Longitude *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., 77.2090"
+              value={longitude}
+              onChangeText={setLongitude}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
         <Text style={styles.hint}>Location changes require admin approval</Text>
       </View>
 
@@ -317,6 +457,41 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  locationButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  locationButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  locationButtonDisabled: {
+    opacity: 0.6,
+  },
+  locationButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfInput: {
+    flex: 1,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
   },
 });
 

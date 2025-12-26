@@ -12,5 +12,7 @@ export class RestaurantProfileDto {
   rejection_reason: string | null;
   created_at: Date;
   updated_at: Date;
+  rating?: number;
+  avg_prep_time_minutes?: number;
 }
 

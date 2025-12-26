@@ -39,6 +39,8 @@ export interface RestaurantProfile {
   rejection_reason: string | null;
   created_at: string;
   updated_at: string;
+  rating?: number;
+  avg_prep_time_minutes?: number;
 }
 
 export interface ChangeRequest {

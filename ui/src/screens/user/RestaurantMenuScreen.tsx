@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Linking, Modal } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { menuService, restaurantService } from '../../services';
 import { MenuItem, RestaurantProfile } from '../../../shared/api-contracts';
 
@@ -13,6 +15,8 @@ export const RestaurantMenuScreen: React.FC = () => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<Record<string, number>>({});
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [addressModalVisible, setAddressModalVisible] = useState(false);
 
   useEffect(() => {
     loadRestaurantData();
@@ -80,6 +84,21 @@ export const RestaurantMenuScreen: React.FC = () => {
     });
   };
 
+  const handleOpenDirections = () => {
+    if (!restaurant) return;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${restaurant.latitude},${restaurant.longitude}`;
+    Linking.openURL(url).catch(err => {
+      Alert.alert('Error', 'Could not open Google Maps');
+    });
+  };
+
+  const handleCopyAddress = async () => {
+    if (restaurant) {
+      await Clipboard.setStringAsync(restaurant.address);
+      Alert.alert('Success', 'Address copied to clipboard');
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -93,10 +112,36 @@ export const RestaurantMenuScreen: React.FC = () => {
       {restaurant && (
         <View style={styles.restaurantHeader}>
           <Text style={styles.restaurantName}>{restaurant.name}</Text>
-          <Text style={styles.restaurantAddress}>{restaurant.address}</Text>
-          {restaurant.rating && (
-            <Text style={styles.rating}>⭐ {restaurant.rating.toFixed(1)}</Text>
-          )}
+          <View style={styles.descriptionRow}>
+            <Text 
+              style={styles.restaurantDescription} 
+              numberOfLines={descriptionExpanded ? undefined : 1}
+            >
+              {restaurant.description || restaurant.address || 'No description available'}
+            </Text>
+            {(restaurant.description || restaurant.address) && (
+              <TouchableOpacity
+                onPress={() => setDescriptionExpanded(!descriptionExpanded)}
+                style={styles.expandButton}
+              >
+                <Text style={styles.expandButtonText}>
+                  {descriptionExpanded ? 'Show Less' : 'Show More'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.addressRow}>
+            <Text style={styles.restaurantAddress} numberOfLines={1}>
+              {restaurant.address}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setAddressModalVisible(true)}
+              style={styles.addressIconButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="location" size={16} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -166,6 +211,48 @@ export const RestaurantMenuScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      <Modal
+        visible={addressModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setAddressModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Restaurant Address</Text>
+            {restaurant && (
+              <>
+                <Text style={styles.modalRestaurantName}>{restaurant.name}</Text>
+                <Text style={styles.modalAddress}>{restaurant.address}</Text>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.copyButton]}
+                    onPress={handleCopyAddress}
+                  >
+                    <Text style={styles.modalButtonText}>📋 Copy Address</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.directionsButton]}
+                    onPress={() => {
+                      handleOpenDirections();
+                      setAddressModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.modalButtonText}>🧭 Open in Maps</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setAddressModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -179,22 +266,49 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#f0f0f0',
   },
   restaurantName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#333',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#1a1a1a',
+    letterSpacing: -0.3,
+  },
+  descriptionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  restaurantDescription: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    flex: 1,
+    marginRight: 6,
+  },
+  expandButton: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  expandButtonText: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   restaurantAddress: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 6,
   },
-  rating: {
-    fontSize: 14,
-    color: '#666',
+  addressIconButton: {
+    padding: 2,
+    marginLeft: 8,
   },
   menuItem: {
     backgroundColor: '#fff',
@@ -319,6 +433,70 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 24,
+    borderRadius: 16,
+    width: '85%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  modalRestaurantName: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
+  },
+  modalAddress: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  copyButton: {
+    backgroundColor: '#34C759',
+  },
+  directionsButton: {
+    backgroundColor: '#007AFF',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  closeButton: {
+    padding: 12,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    marginTop: 8,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: '#666',
   },
 });
 

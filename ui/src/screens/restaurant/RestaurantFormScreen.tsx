@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import { restaurantService } from '../../services';
 import { RestaurantProfile } from '../../../shared/api-contracts';
 
@@ -17,6 +18,8 @@ export const RestaurantFormScreen: React.FC = () => {
   const [paymentAccount, setPaymentAccount] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
 
   useEffect(() => {
     loadRestaurant();
@@ -26,9 +29,87 @@ export const RestaurantFormScreen: React.FC = () => {
   useEffect(() => {
     const unsubscribe = (navigation as any).addListener('focus', () => {
       loadRestaurant();
+      // Check if we're returning from MapPicker with selected location
+      const state = (navigation as any).getState();
+      const currentRoute = state?.routes?.[state.index];
+      if (currentRoute?.params?.selectedLatitude && currentRoute?.params?.selectedLongitude) {
+        setLatitude(currentRoute.params.selectedLatitude.toString());
+        setLongitude(currentRoute.params.selectedLongitude.toString());
+        if (currentRoute.params.selectedAddress) {
+          setAddress(currentRoute.params.selectedAddress);
+        }
+      }
     });
     return unsubscribe;
   }, [navigation]);
+
+  // Auto-populate location if creating new restaurant (only once)
+  useEffect(() => {
+    if (!restaurant && !latitude && !longitude) {
+      getCurrentLocation();
+    }
+  }, [restaurant]);
+
+  const getCurrentLocation = async () => {
+    setGettingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Location permission is required to auto-fill your restaurant location. You can enter it manually.',
+        );
+        setGettingLocation(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      setLatitude(location.coords.latitude.toFixed(6));
+      setLongitude(location.coords.longitude.toFixed(6));
+
+      // Try to reverse geocode to get address if address is empty
+      if (!address) {
+        try {
+          const addresses = await Location.reverseGeocodeAsync({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+          if (addresses.length > 0) {
+            const addr = addresses[0];
+            const addressParts = [
+              addr.street,
+              addr.name,
+              addr.district,
+              addr.city,
+              addr.region,
+              addr.postalCode,
+            ].filter(Boolean);
+            if (addressParts.length > 0) {
+              setAddress(addressParts.join(', '));
+            }
+          }
+        } catch (geocodeError) {
+          console.warn('Failed to reverse geocode:', geocodeError);
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to get current location');
+    } finally {
+      setGettingLocation(false);
+    }
+  };
+
+  const handlePickOnMap = () => {
+    const currentLat = latitude ? parseFloat(latitude) : undefined;
+    const currentLon = longitude ? parseFloat(longitude) : undefined;
+    (navigation as any).navigate('MapPicker', {
+      initialLat: currentLat,
+      initialLon: currentLon,
+    });
+  };
 
   const loadRestaurant = async () => {
     try {
@@ -204,31 +285,34 @@ export const RestaurantFormScreen: React.FC = () => {
         )}
       </View>
 
-      <View style={styles.row}>
-        <View style={styles.halfInput}>
-          <Text style={styles.label}>Latitude *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., 28.6139"
-            value={latitude}
-            onChangeText={setLatitude}
-            keyboardType="numeric"
-          />
+      <View style={styles.section}>
+        <Text style={styles.label}>Location *</Text>
+        <View style={styles.locationButtonsRow}>
+          <TouchableOpacity
+            style={[styles.locationButton, gettingLocation && styles.locationButtonDisabled]}
+            onPress={getCurrentLocation}
+            disabled={gettingLocation}
+          >
+            {gettingLocation ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.locationButtonText}>📍 Get Current Location</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.locationButton}
+            onPress={handlePickOnMap}
+          >
+            <Text style={styles.locationButtonText}>🗺️ Pick on Map</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.halfInput}>
-          <Text style={styles.label}>Longitude *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., 77.2090"
-            value={longitude}
-            onChangeText={setLongitude}
-            keyboardType="numeric"
-          />
-        </View>
+        <Text style={styles.hint}>
+          Location will be set automatically when you use the buttons above or pick on map.
+        </Text>
+        {restaurant && restaurant.status === 'ACTIVE' && (
+          <Text style={styles.hint}>Location changes require admin approval</Text>
+        )}
       </View>
-      {restaurant && restaurant.status === 'ACTIVE' && (
-        <Text style={styles.hint}>Location changes require admin approval</Text>
-      )}
 
       <View style={styles.section}>
         <Text style={styles.label}>Phone</Text>
@@ -381,6 +465,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  locationButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  locationButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  locationButtonDisabled: {
+    opacity: 0.6,
+  },
+  locationButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

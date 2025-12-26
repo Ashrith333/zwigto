@@ -27,7 +27,7 @@ export class OrdersController {
   ) {}
 
   @Post()
-  @Roles(UserRole.USER)
+  @Roles(UserRole.USER, UserRole.ADMIN)
   async createOrder(
     @Request() req: any,
     @Body() dto: CreateOrderDto,
@@ -44,7 +44,7 @@ export class OrdersController {
   }
 
   @Get('me')
-  @Roles(UserRole.USER)
+  @Roles(UserRole.USER, UserRole.ADMIN)
   async getMyOrders(@Request() req: any): Promise<OrderDto[]> {
     return this.ordersService.getUserOrders(req.user.id);
   }
@@ -53,21 +53,24 @@ export class OrdersController {
   // Allow restaurant owners (regardless of role) to view their orders
   async getRestaurantOrders(@Request() req: any): Promise<OrderDto[]> {
     try {
+      console.log('getRestaurantOrders called for user:', req.user.id, 'role:', req.user.role);
+      
       // Check if user owns a restaurant (works for USER, RESTAURANT, ADMIN roles)
-      if (req.user.role !== UserRole.ADMIN) {
-        const restaurantUser = await this.restaurantsService.getRestaurantForUser(req.user.id);
-        if (!restaurantUser) {
-          // Return empty array if no restaurant linked (instead of throwing error)
-          return [];
-        }
-        return this.ordersService.getRestaurantOrders(restaurantUser.restaurant_id);
-      } else {
-        // Admin can view all orders via /admin/orders
-        // For now, return empty array (admin should use /admin/orders)
+      const restaurantUser = await this.restaurantsService.getRestaurantForUser(req.user.id);
+      console.log('Restaurant user found:', restaurantUser);
+      
+      if (!restaurantUser) {
+        console.log('No restaurant linked to user, returning empty array');
+        // Return empty array if no restaurant linked (instead of throwing error)
         return [];
       }
+      
+      const orders = await this.ordersService.getRestaurantOrders(restaurantUser.restaurant_id);
+      console.log(`Found ${orders.length} orders for restaurant ${restaurantUser.restaurant_id}`);
+      return orders;
     } catch (error: any) {
       console.error('Error in getRestaurantOrders:', error);
+      console.error('Error stack:', error.stack);
       // Return empty array on any error to prevent 500
       return [];
     }
@@ -89,17 +92,18 @@ export class OrdersController {
     let restaurantId: string | undefined;
 
     // Check if user owns a restaurant (works for USER, RESTAURANT, ADMIN roles)
-    if (req.user.role !== UserRole.ADMIN) {
-      const restaurantUser = await this.restaurantsService.getRestaurantForUser(
-        req.user.id,
-      );
+    // Admins can also own restaurants, so check for all roles
+    const restaurantUser = await this.restaurantsService.getRestaurantForUser(
+      req.user.id,
+    );
 
-      if (!restaurantUser) {
-        throw new Error('You are not linked to any restaurant');
-      }
-
+    if (restaurantUser) {
       restaurantId = restaurantUser.restaurant_id;
+    } else if (req.user.role !== UserRole.ADMIN) {
+      // Only throw error if not admin and not linked to restaurant
+      throw new Error('You are not linked to any restaurant');
     }
+    // If admin and no restaurant linked, allow them to update any order (restaurantId stays undefined)
 
     return this.ordersService.updateOrderStatus(id, dto, restaurantId);
   }
