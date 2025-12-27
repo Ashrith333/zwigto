@@ -201,6 +201,7 @@ const ForgotPasswordModal: React.FC<{ visible: boolean; onClose: () => void }> =
   visible,
   onClose,
 }) => {
+  const navigation = useNavigation();
   const [phone, setPhone] = useState('+91');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -246,16 +247,46 @@ const ForgotPasswordModal: React.FC<{ visible: boolean; onClose: () => void }> =
     const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
     setLoading(true);
     try {
+      // Reset password
       await authService.resetPassword(formattedPhone, otp, newPassword);
-      Alert.alert('Success', 'Password reset successfully! Please login with your new password.', [
-        { text: 'OK', onPress: onClose },
-      ]);
-      // Reset form
-      setPhone('+91');
-      setOtp('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setStep('phone');
+      
+      // Automatically log in with the new password
+      try {
+        const response = await authService.unifiedAuth({
+          phone: formattedPhone,
+          password: newPassword,
+        });
+
+        if (response.accessToken) {
+          // Login successful - navigate based on default role
+          if (response.user?.default_role) {
+            if (response.user.default_role === 'USER') {
+              (navigation as any).navigate('UserHome');
+            } else if (response.user.default_role === 'RESTAURANT') {
+              (navigation as any).navigate('RestaurantHome');
+            } else if (response.user.default_role === 'ADMIN') {
+              (navigation as any).navigate('AdminHome');
+            } else {
+              (navigation as any).navigate('RoleSelection');
+            }
+          } else {
+            (navigation as any).navigate('RoleSelection');
+          }
+          
+          // Close modal and reset form
+          onClose();
+          setPhone('+91');
+          setOtp('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setStep('phone');
+        }
+      } catch (loginError: any) {
+        // If auto-login fails, show message but password was reset
+        Alert.alert('Password Reset', 'Password reset successfully! Please login with your new password.', [
+          { text: 'OK', onPress: onClose },
+        ]);
+      }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to reset password');
     } finally {

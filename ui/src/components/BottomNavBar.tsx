@@ -18,16 +18,16 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
 
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.container, { marginBottom: Math.max(insets.bottom, 8) }]}>
+      <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 4) }]}>
         <TouchableOpacity
-          style={[styles.navItem, currentScreen === 'Home' && styles.navItemActive]}
+          style={[styles.navItem, styles.navItemHome, currentScreen === 'Home' && styles.navItemActive]}
           onPress={() => (navigation as any).navigate(homeRoute)}
           activeOpacity={0.7}
         >
           <View style={[styles.iconContainer, currentScreen === 'Home' && styles.iconContainerActive]}>
             <Ionicons 
               name={currentScreen === 'Home' ? 'home' : 'home-outline'} 
-              size={24} 
+              size={20} 
               color={currentScreen === 'Home' ? '#007AFF' : '#666'} 
             />
           </View>
@@ -37,14 +37,14 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.navItem, currentScreen === 'Profile' && styles.navItemActive]}
+          style={[styles.navItem, styles.navItemProfile, currentScreen === 'Profile' && styles.navItemActive]}
           onPress={() => (navigation as any).navigate('Profile')}
           activeOpacity={0.7}
         >
           <View style={[styles.iconContainer, currentScreen === 'Profile' && styles.iconContainerActive]}>
             <Ionicons 
               name={currentScreen === 'Profile' ? 'person' : 'person-outline'} 
-              size={24} 
+              size={20} 
               color={currentScreen === 'Profile' ? '#007AFF' : '#666'} 
             />
           </View>
@@ -59,45 +59,55 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
 
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#fff',
     width: '100%',
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    zIndex: 1000,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
   container: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    marginHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 8,
-    paddingHorizontal: 20,
-    justifyContent: 'space-around',
+    width: '100%',
+    paddingTop: 15,
+    paddingHorizontal: 0,
+    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 24,
     borderTopWidth: 0,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     elevation: 10,
-    minHeight: 50,
+    minHeight: 85,
+    flex: 1,
   },
   navItem: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
-    minHeight: 50,
+    paddingVertical: 0,
+    minHeight: 85,
+    position: 'absolute',
+  },
+  navItemHome: {
+    left: '20%',
+    paddingTop: 2,
+  },
+  navItemProfile: {
+    right: '20%',
+    paddingTop: 2,
   },
   navItemActive: {
     // Active state handled by icon and label
   },
   iconContainer: {
-    marginBottom: 4,
-    padding: 4,
-    borderRadius: 8,
+    marginBottom: 3,
+    padding: 2,
+    borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -105,10 +115,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#E3F2FD',
   },
   navLabel: {
-    fontSize: 11,
+    fontSize: 9,
     color: '#666',
     fontWeight: '500',
-    marginTop: 2,
+    marginTop: 1,
   },
   navLabelActive: {
     color: '#007AFF',
