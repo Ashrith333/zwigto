@@ -470,6 +470,77 @@ export const ProfileScreen: React.FC = () => {
 
       <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
+          <Ionicons name="receipt-outline" size={18} color={theme.colors.primary} />
+          <Text style={styles.sectionTitle}>Orders</Text>
+          <TouchableOpacity
+            onPress={() => setOrdersExpanded(!ordersExpanded)}
+            activeOpacity={0.7}
+            style={styles.expandButton}
+          >
+            <Ionicons 
+              name={ordersExpanded ? 'chevron-up' : 'chevron-down'} 
+              size={16} 
+              color={theme.colors.textSecondary} 
+            />
+          </TouchableOpacity>
+        </View>
+        {ordersExpanded && (
+          <>
+            {loadingOrders ? (
+              <Text style={styles.loadingText}>Loading orders...</Text>
+            ) : orders.length === 0 ? (
+              <Text style={styles.emptyText}>No orders yet</Text>
+            ) : (
+              <>
+                <View style={styles.ordersList}>
+                  {orders
+                    .slice(0, ordersPage * ordersPerPage)
+                    .map((order) => (
+                      <TouchableOpacity
+                        key={order.id}
+                        style={styles.orderCard}
+                        onPress={() => (navigation as any).navigate('OrderTracking', { orderId: order.id })}
+                      >
+                        <View style={styles.orderHeader}>
+                          <Text style={styles.orderId}>Order #{getOrderIdDisplay(order.id)}</Text>
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              { backgroundColor: getStatusColor(order.status) },
+                            ]}
+                          >
+                            <Text style={styles.statusText}>{order.status}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.orderAmount}>₹{order.total_amount}</Text>
+                        {profile?.default_pin && order.status !== OrderStatus.PICKED_UP && order.status !== OrderStatus.CANCELLED && (
+                          <View style={styles.orderPinContainer}>
+                            <Ionicons name="lock-closed-outline" size={12} color={theme.colors.textSecondary} />
+                            <Text style={styles.orderPinText}>PIN: {profile.default_pin}</Text>
+                          </View>
+                        )}
+                        <Text style={styles.orderDate}>
+                          {new Date(order.created_at).toLocaleDateString()}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+                {orders.length > ordersPage * ordersPerPage && (
+                  <TouchableOpacity
+                    style={styles.loadMoreButton}
+                    onPress={() => setOrdersPage(ordersPage + 1)}
+                  >
+                    <Text style={styles.loadMoreText}>▶ Load More Orders</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
           <Ionicons name="navigate-outline" size={18} color={theme.colors.primary} />
           <Text style={styles.sectionTitle}>Navigate to Sections</Text>
         </View>
@@ -555,77 +626,6 @@ export const ProfileScreen: React.FC = () => {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <Ionicons name="receipt-outline" size={18} color={theme.colors.primary} />
-          <Text style={styles.sectionTitle}>Orders</Text>
-          <TouchableOpacity
-            onPress={() => setOrdersExpanded(!ordersExpanded)}
-            activeOpacity={0.7}
-            style={styles.expandButton}
-          >
-            <Ionicons 
-              name={ordersExpanded ? 'chevron-up' : 'chevron-down'} 
-              size={16} 
-              color={theme.colors.textSecondary} 
-            />
-          </TouchableOpacity>
-        </View>
-        {ordersExpanded && (
-          <>
-            {loadingOrders ? (
-              <Text style={styles.loadingText}>Loading orders...</Text>
-            ) : orders.length === 0 ? (
-              <Text style={styles.emptyText}>No orders yet</Text>
-            ) : (
-              <>
-                <View style={styles.ordersList}>
-                  {orders
-                    .slice(0, ordersPage * ordersPerPage)
-                    .map((order) => (
-                      <TouchableOpacity
-                        key={order.id}
-                        style={styles.orderCard}
-                        onPress={() => (navigation as any).navigate('OrderTracking', { orderId: order.id })}
-                      >
-                        <View style={styles.orderHeader}>
-                          <Text style={styles.orderId}>Order #{getOrderIdDisplay(order.id)}</Text>
-                          <View
-                            style={[
-                              styles.statusBadge,
-                              { backgroundColor: getStatusColor(order.status) },
-                            ]}
-                          >
-                            <Text style={styles.statusText}>{order.status}</Text>
-                          </View>
-                        </View>
-                        <Text style={styles.orderAmount}>₹{order.total_amount}</Text>
-                        {profile?.default_pin && order.status !== OrderStatus.PICKED_UP && order.status !== OrderStatus.CANCELLED && (
-                          <View style={styles.orderPinContainer}>
-                            <Ionicons name="lock-closed-outline" size={12} color={theme.colors.textSecondary} />
-                            <Text style={styles.orderPinText}>PIN: {profile.default_pin}</Text>
-                          </View>
-                        )}
-                        <Text style={styles.orderDate}>
-                          {new Date(order.created_at).toLocaleDateString()}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                </View>
-                {orders.length > ordersPage * ordersPerPage && (
-                  <TouchableOpacity
-                    style={styles.loadMoreButton}
-                    onPress={() => setOrdersPage(ordersPage + 1)}
-                  >
-                    <Text style={styles.loadMoreText}>▶ Load More Orders</Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            )}
-          </>
-        )}
       </View>
 
 
