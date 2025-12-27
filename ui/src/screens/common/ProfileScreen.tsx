@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,12 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { userService, authService, restaurantService, orderService } from '../../services';
 import { UserProfile, UserRole, Order, OrderStatus } from '../../../shared/api-contracts';
 import { BottomNavBar } from '../../components/BottomNavBar';
+import { theme } from '../../theme/theme';
 
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -23,11 +25,16 @@ export const ProfileScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNavDropdown, setShowNavDropdown] = useState(false);
   const [showDefaultDropdown, setShowDefaultDropdown] = useState(false);
+  const [navDropdownLayout, setNavDropdownLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [defaultDropdownLayout, setDefaultDropdownLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const navDropdownRef = useRef<View>(null);
+  const defaultDropdownRef = useRef<View>(null);
   const [hasRestaurant, setHasRestaurant] = useState(false);
   const [hadRestaurant, setHadRestaurant] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -41,8 +48,8 @@ export const ProfileScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Load orders if user is a customer
-    if (profile && (profile.role === UserRole.USER || !profile.role)) {
+    // Load orders for all roles
+    if (profile) {
       loadOrders();
     }
   }, [profile]);
@@ -316,77 +323,175 @@ export const ProfileScreen: React.FC = () => {
           setShowNavDropdown(false);
           setShowDefaultDropdown(false);
         }}
+        showsVerticalScrollIndicator={false}
       >
-      <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Personal Information</Text>
-        <Text style={styles.label}>Phone</Text>
-        <TextInput style={styles.input} value={profile.phone} editable={false} />
-        <Text style={styles.label}>Name</Text>
-        <TextInput
-          style={styles.input}
-          value={name}
-          onChangeText={setName}
-          placeholder="Enter your name"
-        />
-        <TouchableOpacity
-          style={[styles.button, styles.saveButton, loading && styles.buttonDisabled]}
-          onPress={handleSaveProfile}
-          disabled={loading || !name.trim()}
-        >
-          <Text style={styles.buttonText}>Save Name</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Navigate to Sections</Text>
-        <Text style={styles.sectionDescription}>
-          Switch between different sections of the app.
+      {/* Modern Profile Header */}
+      <View style={styles.profileHeader}>
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {(profile.name || profile.phone || 'U').charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.profileName}>
+          {profile.name || 'User'}
         </Text>
-        <View style={styles.dropdownContainer}>
+        <Text style={styles.profilePhone}>{profile.phone}</Text>
+        {profile.default_role && (
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleBadgeText}>
+              {profile.default_role === UserRole.USER ? '👤 Customer' :
+               profile.default_role === UserRole.RESTAURANT ? '🍽️ Restaurant Owner' :
+               '⚙️ Admin'}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <Ionicons name="person-outline" size={18} color={theme.colors.primary} />
+          <Text style={styles.sectionTitle}>Personal Information</Text>
+        </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Phone Number</Text>
+          <View style={styles.inputContainer}>
+            <Ionicons name="call-outline" size={14} color={theme.colors.textSecondary} style={styles.inputIcon} />
+            <TextInput 
+              style={[styles.input, styles.inputDisabled]} 
+              value={profile.phone} 
+              editable={false} 
+            />
+          </View>
+        </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Full Name</Text>
+          <View style={styles.inputContainer}>
+            <Ionicons name="person-outline" size={14} color={theme.colors.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Enter your name"
+              placeholderTextColor={theme.colors.textTertiary}
+            />
+          </View>
+        </View>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[
+              styles.button, 
+              styles.saveButton, 
+              (name.trim() === (profile.name || '')) && styles.saveButtonDisabled,
+              loading && styles.buttonDisabled
+            ]}
+            onPress={handleSaveProfile}
+            disabled={loading || !name.trim() || name.trim() === (profile.name || '')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="checkmark" 
+              size={14} 
+              color={(name.trim() === (profile.name || '')) ? theme.colors.textSecondary : "#fff"} 
+              style={styles.buttonIcon} 
+            />
+            <Text style={[
+              styles.buttonText,
+              (name.trim() === (profile.name || '')) && styles.saveButtonTextDisabled
+            ]}>Save</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.changePasswordButton]}
+            onPress={() => setShowChangePassword(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="key-outline" size={14} color={theme.colors.textPrimary} style={styles.buttonIcon} />
+            <Text style={styles.buttonTextWhite}>Password</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.button, styles.logoutButton]} 
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="log-out-outline" size={14} color={theme.colors.textPrimary} style={styles.buttonIcon} />
+            <Text style={styles.buttonTextWhite}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <Ionicons name="navigate-outline" size={18} color={theme.colors.primary} />
+          <Text style={styles.sectionTitle}>Navigate to Sections</Text>
+        </View>
+        <Text style={styles.sectionDescription}>
+          Switch between different sections of the app
+        </Text>
+        <View 
+          style={styles.dropdownContainer}
+          ref={navDropdownRef}
+          collapsable={false}
+          onLayout={() => {
+            if (navDropdownRef.current) {
+              navDropdownRef.current.measure((x, y, width, height, pageX, pageY) => {
+                setNavDropdownLayout({ x: pageX, y: pageY, width, height });
+              });
+            }
+          }}
+        >
           <TouchableOpacity
             style={[styles.dropdownButton, loading && styles.buttonDisabled]}
-            onPress={() => setShowNavDropdown(!showNavDropdown)}
+            onPress={() => {
+              if (navDropdownRef.current) {
+                navDropdownRef.current.measure((x, y, width, height, pageX, pageY) => {
+                  setNavDropdownLayout({ x: pageX, y: pageY, width, height });
+                });
+              }
+              setShowNavDropdown(!showNavDropdown);
+            }}
             disabled={loading}
           >
             <Text style={styles.dropdownButtonText}>{getCurrentSectionLabel()}</Text>
             <Text style={styles.dropdownArrow}>{showNavDropdown ? '▲' : '▼'}</Text>
           </TouchableOpacity>
-          {showNavDropdown && (
-            <View style={styles.dropdownList}>
-              {getAvailableRoles().map((role, index, array) => (
-                <TouchableOpacity
-                  key={role}
-                  style={[
-                    styles.dropdownItem,
-                    index === array.length - 1 && styles.dropdownItemLast,
-                  ]}
-                  onPress={() => handleNavigateToSection(role)}
-                >
-                  <Text style={styles.dropdownItemText}>{getRoleLabel(role)}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Set Default View</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Ionicons name="home-outline" size={18} color={theme.colors.primary} />
+          <Text style={styles.sectionTitle}>Set Default View</Text>
+        </View>
         <Text style={styles.sectionDescription}>
-          Select your default view. This will be your default page when you login next time.
+          Choose your default landing page for future logins
         </Text>
-        <View style={styles.dropdownContainer}>
+        <View 
+          style={styles.dropdownContainer}
+          ref={defaultDropdownRef}
+          collapsable={false}
+          onLayout={() => {
+            if (defaultDropdownRef.current) {
+              defaultDropdownRef.current.measure((x, y, width, height, pageX, pageY) => {
+                setDefaultDropdownLayout({ x: pageX, y: pageY, width, height });
+              });
+            }
+          }}
+        >
           <TouchableOpacity
             style={[
               styles.dropdownButton,
               profile.default_role && styles.dropdownButtonActive,
               loading && styles.buttonDisabled,
             ]}
-            onPress={() => setShowDefaultDropdown(!showDefaultDropdown)}
+            onPress={() => {
+              if (defaultDropdownRef.current) {
+                defaultDropdownRef.current.measure((x, y, width, height, pageX, pageY) => {
+                  setDefaultDropdownLayout({ x: pageX, y: pageY, width, height });
+                });
+              }
+              setShowDefaultDropdown(!showDefaultDropdown);
+            }}
             disabled={loading}
           >
             <Text
@@ -401,111 +506,74 @@ export const ProfileScreen: React.FC = () => {
               {showDefaultDropdown ? '▲' : '▼'}
             </Text>
           </TouchableOpacity>
-          {showDefaultDropdown && (
-            <View style={styles.dropdownList}>
-              {getAvailableRoles().map((role, index, array) => (
-                <TouchableOpacity
-                  key={role}
-                  style={[
-                    styles.dropdownItem,
-                    index === array.length - 1 && styles.dropdownItemLast,
-                    profile.default_role === role && styles.dropdownItemActive,
-                  ]}
-                  onPress={() => {
-                    handleSetDefaultView(role);
-                    setShowDefaultDropdown(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemText,
-                      profile.default_role === role && styles.dropdownItemTextActive,
-                    ]}
-                  >
-                    {getDefaultRoleLabel(role)}
-                    {profile.default_role === role && ' ✓'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
         </View>
       </View>
 
-      {(profile?.role === UserRole.USER || !profile?.role) && (
-        <View style={styles.section}>
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <Ionicons name="receipt-outline" size={18} color={theme.colors.primary} />
+          <Text style={styles.sectionTitle}>Orders</Text>
           <TouchableOpacity
-            style={styles.sectionHeader}
             onPress={() => setOrdersExpanded(!ordersExpanded)}
+            activeOpacity={0.7}
+            style={styles.expandButton}
           >
-            <Text style={styles.sectionTitle}>Orders</Text>
-            <Text style={styles.expandIcon}>{ordersExpanded ? '▼' : '▶'}</Text>
+            <Ionicons 
+              name={ordersExpanded ? 'chevron-up' : 'chevron-down'} 
+              size={16} 
+              color={theme.colors.textSecondary} 
+            />
           </TouchableOpacity>
-          {ordersExpanded && (
-            <>
-              {loadingOrders ? (
-                <Text style={styles.loadingText}>Loading orders...</Text>
-              ) : orders.length === 0 ? (
-                <Text style={styles.emptyText}>No orders yet</Text>
-              ) : (
-                <>
-                  <View style={styles.ordersList}>
-                    {orders
-                      .slice(0, ordersPage * ordersPerPage)
-                      .map((order) => (
-                        <TouchableOpacity
-                          key={order.id}
-                          style={styles.orderCard}
-                          onPress={() => (navigation as any).navigate('OrderTracking', { orderId: order.id })}
-                        >
-                          <View style={styles.orderHeader}>
-                            <Text style={styles.orderId}>Order #{order.id.slice(0, 8)}</Text>
-                            <View
-                              style={[
-                                styles.statusBadge,
-                                { backgroundColor: getStatusColor(order.status) },
-                              ]}
-                            >
-                              <Text style={styles.statusText}>{order.status}</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.orderAmount}>₹{order.total_amount}</Text>
-                          <Text style={styles.orderDate}>
-                            {new Date(order.created_at).toLocaleDateString()}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                  </View>
-                  {orders.length > ordersPage * ordersPerPage && (
-                    <TouchableOpacity
-                      style={styles.loadMoreButton}
-                      onPress={() => setOrdersPage(ordersPage + 1)}
-                    >
-                      <Text style={styles.loadMoreText}>▶ Load More Orders</Text>
-                    </TouchableOpacity>
-                  )}
-                </>
-              )}
-            </>
-          )}
         </View>
-      )}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security</Text>
-        <TouchableOpacity
-          style={[styles.button, styles.changePasswordButton]}
-          onPress={() => setShowChangePassword(true)}
-        >
-          <Text style={styles.buttonText}>Change Password</Text>
-        </TouchableOpacity>
+        {ordersExpanded && (
+          <>
+            {loadingOrders ? (
+              <Text style={styles.loadingText}>Loading orders...</Text>
+            ) : orders.length === 0 ? (
+              <Text style={styles.emptyText}>No orders yet</Text>
+            ) : (
+              <>
+                <View style={styles.ordersList}>
+                  {orders
+                    .slice(0, ordersPage * ordersPerPage)
+                    .map((order) => (
+                      <TouchableOpacity
+                        key={order.id}
+                        style={styles.orderCard}
+                        onPress={() => (navigation as any).navigate('OrderTracking', { orderId: order.id })}
+                      >
+                        <View style={styles.orderHeader}>
+                          <Text style={styles.orderId}>Order #{order.id.slice(0, 8)}</Text>
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              { backgroundColor: getStatusColor(order.status) },
+                            ]}
+                          >
+                            <Text style={styles.statusText}>{order.status}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.orderAmount}>₹{order.total_amount}</Text>
+                        <Text style={styles.orderDate}>
+                          {new Date(order.created_at).toLocaleDateString()}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+                {orders.length > ordersPage * ordersPerPage && (
+                  <TouchableOpacity
+                    style={styles.loadMoreButton}
+                    onPress={() => setOrdersPage(ordersPage + 1)}
+                  >
+                    <Text style={styles.loadMoreText}>▶ Load More Orders</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </>
+        )}
       </View>
 
-      <View style={styles.section}>
-        <TouchableOpacity style={[styles.button, styles.logoutButton]} onPress={handleLogout}>
-          <Text style={styles.buttonText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
 
       <Modal
         visible={showChangePassword}
@@ -515,34 +583,58 @@ export const ProfileScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Change Password</Text>
-            <Text style={styles.label}>Current Password</Text>
-            <TextInput
-              style={styles.input}
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder="Enter current password"
-              secureTextEntry
-            />
-            <Text style={styles.label}>New Password</Text>
-            <TextInput
-              style={styles.input}
-              value={newPassword}
-              onChangeText={setNewPassword}
-              placeholder="Enter new password"
-              secureTextEntry
-            />
-            <Text style={styles.label}>Confirm New Password</Text>
-            <TextInput
-              style={styles.input}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Confirm new password"
-              secureTextEntry
-            />
+            <Text style={styles.modalTitle}>Update Password</Text>
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.label}>Current Password</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                placeholder="Enter current password"
+                placeholderTextColor={theme.colors.textTertiary}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  setShowChangePassword(false);
+                  setShowForgotPassword(true);
+                }}
+                style={styles.forgotPasswordLink}
+              >
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.label}>New Password</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="Enter new password"
+                placeholderTextColor={theme.colors.textTertiary}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.label}>Confirm New Password</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Confirm new password"
+                placeholderTextColor={theme.colors.textTertiary}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                style={[styles.button, styles.modalCancelButton]}
                 onPress={() => {
                   setShowChangePassword(false);
                   setCurrentPassword('');
@@ -553,16 +645,121 @@ export const ProfileScreen: React.FC = () => {
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.button, styles.saveButton, loading && styles.buttonDisabled]}
+                style={[styles.button, styles.modalUpdateButton, loading && styles.buttonDisabled]}
                 onPress={handleChangePassword}
                 disabled={loading}
               >
-                <Text style={styles.buttonText}>Change Password</Text>
+                <Text style={styles.buttonText}>Update</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Navigate to Sections Dropdown Modal */}
+      <Modal
+        visible={showNavDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowNavDropdown(false)}
+      >
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setShowNavDropdown(false)}
+        >
+          <View
+            style={[
+              styles.dropdownList,
+              {
+                position: 'absolute',
+                top: navDropdownLayout.y + navDropdownLayout.height + 4,
+                left: navDropdownLayout.x,
+                width: navDropdownLayout.width,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            {getAvailableRoles().map((role, index, array) => (
+              <TouchableOpacity
+                key={role}
+                style={[
+                  styles.dropdownItem,
+                  index === array.length - 1 && styles.dropdownItemLast,
+                ]}
+                onPress={() => {
+                  handleNavigateToSection(role);
+                  setShowNavDropdown(false);
+                }}
+              >
+                <Text style={styles.dropdownItemText}>{getRoleLabel(role)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Set Default View Dropdown Modal */}
+      <Modal
+        visible={showDefaultDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDefaultDropdown(false)}
+      >
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDefaultDropdown(false)}
+        >
+          <View
+            style={[
+              styles.dropdownList,
+              {
+                position: 'absolute',
+                top: defaultDropdownLayout.y + defaultDropdownLayout.height + 4,
+                left: defaultDropdownLayout.x,
+                width: defaultDropdownLayout.width,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            {getAvailableRoles().map((role, index, array) => (
+              <TouchableOpacity
+                key={role}
+                style={[
+                  styles.dropdownItem,
+                  index === array.length - 1 && styles.dropdownItemLast,
+                  profile.default_role === role && styles.dropdownItemActive,
+                ]}
+                onPress={() => {
+                  handleSetDefaultView(role);
+                  setShowDefaultDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.dropdownItemText,
+                    profile.default_role === role && styles.dropdownItemTextActive,
+                  ]}
+                >
+                  {getDefaultRoleLabel(role)}
+                  {profile.default_role === role && ' ✓'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        visible={showForgotPassword}
+        onClose={() => {
+          setShowForgotPassword(false);
+        }}
+        userPhone={profile?.phone}
+      />
+
       </ScrollView>
       <BottomNavBar 
         currentScreen="Profile" 
@@ -581,142 +778,269 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flex: 1,
   },
-  header: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  profileHeader: {
+    backgroundColor: theme.colors.primary,
+    paddingTop: 24,
+    paddingBottom: 16,
+    paddingHorizontal: theme.spacing.md,
+    alignItems: 'center',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    ...theme.shadows.md,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+  avatarContainer: {
+    marginBottom: theme.spacing.xs,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  profilePhone: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: theme.spacing.xs,
+  },
+  roleBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.round,
+    marginTop: 2,
+  },
+  roleBadgeText: {
+    ...theme.typography.smallBold,
+    color: '#fff',
   },
   section: {
-    backgroundColor: '#fff',
-    marginTop: 10,
-    padding: 20,
+    backgroundColor: theme.colors.surface,
+    marginTop: theme.spacing.sm,
+    marginHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    ...theme.shadows.sm,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+    gap: theme.spacing.sm,
+  },
+  expandButton: {
+    marginLeft: 'auto',
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
+    fontSize: 17,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    flex: 1,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
-  },
-  expandIcon: {
-    fontSize: 16,
-    color: '#666',
+    marginBottom: theme.spacing.md,
   },
   sectionDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 15,
+    fontSize: 12,
+    fontWeight: '400',
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.sm,
+    lineHeight: 18,
+  },
+  inputGroup: {
+    marginBottom: theme.spacing.sm,
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
+    color: theme.colors.textPrimary,
+    marginBottom: 6,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 2,
+  },
+  inputIcon: {
+    marginRight: theme.spacing.xs,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 12,
-    marginBottom: 15,
-    borderRadius: 8,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '400',
+    color: theme.colors.textPrimary,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: 0,
+  },
+  inputDisabled: {
+    backgroundColor: theme.colors.background,
+    color: theme.colors.textSecondary,
   },
   button: {
-    padding: 15,
-    borderRadius: 8,
+    flexDirection: 'row',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
     alignItems: 'center',
-    marginTop: 10,
+    justifyContent: 'center',
+    marginTop: theme.spacing.sm,
+    ...theme.shadows.sm,
+    minHeight: 36,
+  },
+  buttonIcon: {
+    marginRight: theme.spacing.xs,
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.sm,
+    flex: 0.5,
+    marginTop: 0,
+  },
+  saveButtonDisabled: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  saveButtonTextDisabled: {
+    color: theme.colors.textSecondary,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+  },
+  buttonThird: {
+    flex: 1,
+    marginTop: 0,
+  },
+  buttonHalf: {
+    flex: 1,
+    marginTop: 0,
   },
   changePasswordButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    flex: 1.2,
+    marginTop: 0,
   },
   logoutButton: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    flex: 0.9,
+    marginTop: 0,
+  },
+  buttonTextWhite: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
   },
   cancelButton: {
-    backgroundColor: '#8E8E93',
+    backgroundColor: theme.colors.textTertiary,
+  },
+  modalCancelButton: {
+    backgroundColor: theme.colors.textTertiary,
+    flex: 1,
+    marginTop: 0,
+    paddingVertical: theme.spacing.md,
+    minHeight: 44,
+  },
+  modalUpdateButton: {
+    backgroundColor: theme.colors.primary,
+    flex: 1,
+    marginTop: 0,
+    paddingVertical: theme.spacing.md,
+    minHeight: 44,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textInverse,
   },
   dropdownContainer: {
     position: 'relative',
-    zIndex: 1,
+    zIndex: 1000,
   },
   dropdownButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
   },
   dropdownButtonActive: {
-    borderColor: '#007AFF',
+    borderColor: theme.colors.primary,
     backgroundColor: '#E3F2FD',
   },
   dropdownButtonText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 14,
+    fontWeight: '400',
+    color: theme.colors.textSecondary,
     flex: 1,
   },
   dropdownButtonTextActive: {
-    color: '#007AFF',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   dropdownArrow: {
     fontSize: 12,
-    color: '#666',
-    marginLeft: 10,
+    color: theme.colors.textSecondary,
+    marginLeft: theme.spacing.sm,
+  },
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
   },
   dropdownList: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    marginTop: 4,
-    borderRadius: 8,
-    backgroundColor: '#fff',
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#ddd',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1000,
+    borderColor: theme.colors.border,
+    ...theme.shadows.lg,
+    elevation: 25,
   },
   dropdownItem: {
-    padding: 15,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.colors.borderLight,
   },
   dropdownItemLast: {
     borderBottomWidth: 0,
@@ -725,11 +1049,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#E3F2FD',
   },
   dropdownItemText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 14,
+    fontWeight: '400',
+    color: theme.colors.textPrimary,
   },
   dropdownItemTextActive: {
-    color: '#007AFF',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   modalOverlay: {
@@ -739,22 +1064,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
     width: '90%',
     maxWidth: 400,
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
+    ...theme.typography.h2,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.lg,
+  },
+  modalInputGroup: {
+    marginBottom: theme.spacing.md,
+  },
+  modalInput: {
+    width: '100%',
+    fontSize: 14,
+    fontWeight: '400',
+    color: theme.colors.textPrimary,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surface,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
+    marginTop: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   loadingText: {
     textAlign: 'center',
@@ -767,59 +1107,287 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   ordersList: {
-    marginTop: 10,
+    marginTop: theme.spacing.sm,
   },
   orderCard: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
-    marginBottom: 10,
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
+    borderColor: theme.colors.border,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.background,
+    ...theme.shadows.sm,
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   orderId: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.round,
   },
   statusText: {
+    fontSize: 10,
+    fontWeight: '600',
     color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   orderAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+    color: theme.colors.textPrimary,
   },
   orderDate: {
     fontSize: 12,
-    color: '#666',
+    fontWeight: '400',
+    color: theme.colors.textSecondary,
   },
   loadMoreButton: {
-    marginTop: 15,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+    marginTop: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.sm,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   loadMoreText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.primary,
+  },
+  forgotPasswordLink: {
+    alignSelf: 'flex-end',
+    marginTop: 4,
+  },
+  forgotPasswordText: {
+    color: theme.colors.primary,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  linkButton: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  linkText: {
+    color: theme.colors.primary,
     fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
   },
 });
+
+// Forgot Password Modal Component
+const ForgotPasswordModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  userPhone?: string;
+}> = ({ visible, onClose, userPhone }) => {
+  const [phone, setPhone] = useState(userPhone || '+91');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [step, setStep] = useState<'phone' | 'otp' | 'password'>('phone');
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (userPhone) {
+      setPhone(userPhone);
+    }
+  }, [userPhone]);
+
+  const handleRequestOtp = async () => {
+    if (!phone) {
+      Alert.alert('Error', 'Please enter your phone number');
+      return;
+    }
+
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+    setLoading(true);
+    try {
+      await authService.requestPasswordReset(formattedPhone);
+      Alert.alert('Success', 'OTP sent to your phone number');
+      setStep('otp');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!otp || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill all fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+    setLoading(true);
+    try {
+      await authService.resetPassword(formattedPhone, otp, newPassword);
+      Alert.alert('Success', 'Password reset successfully!', [
+        { text: 'OK', onPress: onClose },
+      ]);
+      // Reset form
+      setOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setStep('phone');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to reset password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setStep('phone');
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={handleClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Reset Password</Text>
+
+          {step === 'phone' && (
+            <>
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.label}>Phone Number</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="+91XXXXXXXXXX"
+                  value={phone}
+                  onChangeText={(text) => {
+                    if (text.length > 0 && !text.startsWith('+')) {
+                      setPhone(`+91${text}`);
+                    } else {
+                      setPhone(text);
+                    }
+                  }}
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                  editable={!userPhone}
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.button, styles.modalUpdateButton, loading && styles.buttonDisabled]}
+                onPress={handleRequestOtp}
+                disabled={loading}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Sending...' : 'Send OTP'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {step === 'otp' && (
+            <>
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.label}>Enter OTP sent to {phone}</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Enter 6-digit OTP"
+                  value={otp}
+                  onChangeText={setOtp}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.button, styles.modalUpdateButton, (loading || !otp) && styles.buttonDisabled]}
+                onPress={() => {
+                  if (otp.length === 6) {
+                    setStep('password');
+                  } else {
+                    Alert.alert('Error', 'Please enter a valid 6-digit OTP');
+                  }
+                }}
+                disabled={loading || !otp}
+              >
+                <Text style={styles.buttonText}>Verify OTP</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setStep('phone')} style={styles.linkButton}>
+                <Text style={styles.linkText}>Change phone number</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {step === 'password' && (
+            <>
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.label}>New Password</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Enter new password"
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.label}>Confirm New Password</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Confirm new password"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.button, styles.modalUpdateButton, (loading || !newPassword || !confirmPassword) && styles.buttonDisabled]}
+                onPress={handleResetPassword}
+                disabled={loading || !newPassword || !confirmPassword}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Resetting...' : 'Reset Password'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setStep('otp')} style={styles.linkButton}>
+                <Text style={styles.linkText}>Back to OTP</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          <TouchableOpacity onPress={handleClose} style={styles.linkButton}>
+            <Text style={styles.linkText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 

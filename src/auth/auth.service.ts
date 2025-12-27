@@ -11,6 +11,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { SetPasswordDto } from './dto/set-password.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { ForgotPasswordRequestDto, ResetPasswordDto } from './dto/forgot-password.dto';
 import { User, UserPayload, UserRole } from './interfaces/user.interface';
 import { SupabaseOtpProvider } from './providers/supabase-otp.provider';
 import { SupabaseProvider } from './providers/supabase.provider';
@@ -272,6 +273,45 @@ export class AuthService {
 
   async validateUser(userId: string): Promise<User | null> {
     return this.supabaseProvider.findUserById(userId);
+  }
+
+  async requestPasswordReset(dto: ForgotPasswordRequestDto): Promise<{ message: string }> {
+    // Check if user exists
+    const user = await this.supabaseProvider.findUserByPhone(dto.phone);
+    if (!user) {
+      throw new BadRequestException('User not found with this phone number');
+    }
+
+    // Send OTP for password reset
+    try {
+      await this.otpProvider.sendOtp(dto.phone);
+      return { message: 'OTP sent successfully. Please verify to reset your password.' };
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Failed to send OTP',
+      );
+    }
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    // Verify OTP
+    const isValid = await this.otpProvider.verifyOtp(dto.phone, dto.otp);
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    // Check if user exists
+    const user = await this.supabaseProvider.findUserByPhone(dto.phone);
+    if (!user) {
+      throw new BadRequestException('User not found with this phone number');
+    }
+
+    // Hash and update password
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(dto.new_password, saltRounds);
+    await this.supabaseProvider.updateUserPassword(user.id, newPasswordHash);
+
+    return { message: 'Password reset successfully' };
   }
 }
 

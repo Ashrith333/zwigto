@@ -15,6 +15,7 @@ import { SetPasswordDto } from './dto/set-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UnifiedAuthDto } from './dto/unified-auth.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { ForgotPasswordRequestDto, ResetPasswordDto } from './dto/forgot-password.dto';
 import { Public } from './decorators/public.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -70,6 +71,24 @@ export class AuthController {
     @Body() dto: UnifiedAuthDto,
   ): Promise<AuthResponseDto | { message: string; requiresOtp: boolean }> {
     return this.authService.unifiedAuth(dto);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async requestPasswordReset(
+    @Body() dto: ForgotPasswordRequestDto,
+  ): Promise<{ message: string }> {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+  ): Promise<{ message: string }> {
+    return this.authService.resetPassword(dto);
   }
 }
 

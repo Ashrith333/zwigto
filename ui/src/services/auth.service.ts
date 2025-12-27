@@ -50,6 +50,20 @@ class AuthService {
     });
   }
 
+  async requestPasswordReset(phone: string): Promise<{ message: string }> {
+    return apiClient.post<{ message: string }>('/auth/forgot-password', {
+      phone,
+    }, false);
+  }
+
+  async resetPassword(phone: string, otp: string, newPassword: string): Promise<{ message: string }> {
+    return apiClient.post<{ message: string }>('/auth/reset-password', {
+      phone,
+      otp,
+      new_password: newPassword,
+    }, false);
+  }
+
   async logout(): Promise<void> {
     await AsyncStorage.removeItem('auth_token');
     await AsyncStorage.removeItem('auth_user_data');
