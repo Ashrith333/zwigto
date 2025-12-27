@@ -10,6 +10,9 @@ export interface User {
   password_hash: string | null;
   role: UserRole;
   default_pin: string | null; // 4-digit PIN for order pickup verification
+  default_role: UserRole | null; // Default selected role for navigation
+  name: string | null; // User's name
+  default_addresses: any[] | null; // Array of default addresses (JSONB)
 }
 
 export interface UserPayload {

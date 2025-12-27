@@ -65,6 +65,8 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
+            returnKeyType="done"
+            blurOnSubmit={true}
           />
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -83,6 +85,8 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({
             value={otp}
             onChangeText={setOtp}
             keyboardType="number-pad"
+            returnKeyType="done"
+            blurOnSubmit={true}
           />
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}

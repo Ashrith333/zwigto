@@ -170,6 +170,7 @@ export class AuthService {
           id: user.id,
           phone: user.phone,
           role: user.role as UserRole,
+          default_role: user.default_role as UserRole | undefined,
         },
       };
     }
@@ -241,8 +242,32 @@ export class AuthService {
         id: finalUser.id,
         phone: finalUser.phone,
         role: finalUser.role as UserRole,
+        default_role: finalUser.default_role as UserRole | undefined,
       },
     };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.supabaseProvider.findUserById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.password_hash) {
+      throw new BadRequestException('Password not set. Please set a password first.');
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+    await this.supabaseProvider.updateUserPassword(user.id, newPasswordHash);
+
+    return { message: 'Password changed successfully' };
   }
 
   async validateUser(userId: string): Promise<User | null> {

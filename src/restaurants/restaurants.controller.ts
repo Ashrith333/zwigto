@@ -200,5 +200,24 @@ export class RestaurantsController {
   async getAllChangeRequests(): Promise<ChangeRequestDto[]> {
     return this.restaurantsService.getAllChangeRequests();
   }
+
+  @Post(':id/delete')
+  // Allow restaurant owners (regardless of role) to delete their restaurant
+  async deleteRestaurant(
+    @Param('id') id: string,
+    @Request() req: any,
+  ): Promise<{ message: string }> {
+    // Check if user owns this restaurant
+    if (req.user.role !== UserRole.ADMIN) {
+      const restaurantUser = await this.restaurantsService.getRestaurantForUser(req.user.id);
+
+      if (!restaurantUser || restaurantUser.restaurant_id !== id) {
+        throw new ForbiddenException('You can only delete your own restaurant');
+      }
+    }
+
+    await this.restaurantsService.deleteRestaurant(id, req.user.id);
+    return { message: 'Restaurant deleted successfully' };
+  }
 }
 

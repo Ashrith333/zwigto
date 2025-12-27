@@ -214,6 +214,8 @@ export const RestaurantFormScreen: React.FC = () => {
           placeholder="Enter restaurant name"
           value={name}
           onChangeText={setName}
+          returnKeyType="next"
+          blurOnSubmit={true}
         />
         {restaurant && restaurant.status === 'ACTIVE' && (
           <Text style={styles.hint}>Name changes require admin approval</Text>
@@ -223,12 +225,12 @@ export const RestaurantFormScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.label}>Description</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={styles.input}
           placeholder="Describe your restaurant..."
           value={description}
           onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
+          returnKeyType="next"
+          blurOnSubmit={true}
         />
       </View>
 
@@ -284,6 +286,8 @@ export const RestaurantFormScreen: React.FC = () => {
           value={phone}
           onChangeText={setPhone}
           keyboardType="phone-pad"
+          returnKeyType="next"
+          blurOnSubmit={true}
         />
       </View>
 
@@ -296,18 +300,20 @@ export const RestaurantFormScreen: React.FC = () => {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          returnKeyType="next"
+          blurOnSubmit={true}
         />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.label}>Payment Details</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={styles.input}
           placeholder="UPI ID, QR code, or Bank account details"
           value={paymentAccount}
           onChangeText={setPaymentAccount}
-          multiline
-          numberOfLines={3}
+          returnKeyType="done"
+          blurOnSubmit={true}
         />
         {restaurant && restaurant.status === 'ACTIVE' && (
           <Text style={styles.hint}>Payment details changes require admin approval</Text>

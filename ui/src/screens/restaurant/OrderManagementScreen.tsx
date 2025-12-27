@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Modal, TextInput } from 'react-native';
-import { orderService, restaurantService } from '../../services';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { orderService, restaurantService, websocketService } from '../../services';
 import { Order, OrderStatus } from '../../../shared/api-contracts';
+import { theme } from '../../theme/theme';
 
 export const OrderManagementScreen: React.FC = () => {
+  const navigation = useNavigation();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,6 +44,41 @@ export const OrderManagementScreen: React.FC = () => {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       setOrders(sortedOrders);
+      
+      // Subscribe to WebSocket updates for this restaurant
+      if (restaurant.id) {
+        websocketService.subscribeToRestaurantOrders(restaurant.id, (updatedOrder) => {
+          // Update or add order to the list
+          setOrders((prevOrders) => {
+            const existingIndex = prevOrders.findIndex(o => o.id === updatedOrder.id);
+            
+            // Filter out picked up or cancelled orders
+            if (updatedOrder.status === OrderStatus.PICKED_UP || updatedOrder.status === OrderStatus.CANCELLED) {
+              if (existingIndex >= 0) {
+                // Remove from list
+                return prevOrders.filter(o => o.id !== updatedOrder.id);
+              }
+              return prevOrders;
+            }
+            
+            if (existingIndex >= 0) {
+              // Update existing order
+              const newOrders = [...prevOrders];
+              newOrders[existingIndex] = updatedOrder;
+              return newOrders.sort((a, b) => 
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              );
+            } else {
+              // Add new order
+              return [...prevOrders, updatedOrder].sort((a, b) => 
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              );
+            }
+          });
+        }).catch((error) => {
+          console.error('Failed to subscribe to restaurant order updates:', error);
+        });
+      }
     } catch (error: any) {
       console.error('Failed to load orders:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
@@ -100,7 +139,21 @@ export const OrderManagementScreen: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
+    
+    return () => {
+      // Unsubscribe from WebSocket when component unmounts
+      if (restaurantId) {
+        websocketService.unsubscribeFromRestaurant(restaurantId).catch(console.error);
+      }
+    };
   }, []);
+  
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadOrders();
+    }, [])
+  );
 
   const handleAccept = async (orderId: string) => {
     try {
@@ -167,7 +220,11 @@ export const OrderManagementScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Order Management</Text>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Order Management</Text>
+        </View>
+      </SafeAreaView>
       <FlatList
         data={orders}
         keyExtractor={(item) => item.id}
@@ -266,6 +323,8 @@ export const OrderManagementScreen: React.FC = () => {
               keyboardType="number-pad"
               maxLength={4}
               secureTextEntry={false}
+              returnKeyType="done"
+              blurOnSubmit={true}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -298,19 +357,33 @@ export const OrderManagementScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: theme.colors.background,
+  },
+  safeArea: {
+    backgroundColor: theme.colors.surface,
+  },
+  header: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    ...theme.shadows.sm,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    ...theme.typography.h2,
+    color: theme.colors.textPrimary,
   },
   orderCard: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
-    marginBottom: 10,
-    borderRadius: 8,
+    borderColor: theme.colors.border,
+    padding: theme.spacing.md,
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface,
+    ...theme.shadows.sm,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -319,18 +392,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   orderId: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    ...theme.typography.bodyBold,
+    color: theme.colors.textPrimary,
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.round,
   },
   statusText: {
-    fontSize: 12,
-    color: '#fff',
-    fontWeight: '600',
+    ...theme.typography.smallBold,
+    color: theme.colors.textInverse,
   },
   paymentStatus: {
     fontSize: 12,
@@ -368,28 +440,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   acceptButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: theme.colors.success,
   },
   rejectButton: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: theme.colors.error,
   },
   updateButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
   },
   actionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    color: theme.colors.textInverse,
+    ...theme.typography.captionBold,
   },
   orderAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
+    ...theme.typography.h3,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.xs,
   },
   orderDate: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 10,
+    ...theme.typography.small,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.sm,
   },
   emptyText: {
     textAlign: 'center',
@@ -403,22 +474,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    padding: 24,
-    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.xl,
     width: '80%',
     maxWidth: 400,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    ...theme.typography.h3,
+    marginBottom: theme.spacing.sm,
     textAlign: 'center',
+    color: theme.colors.textPrimary,
   },
   modalSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.lg,
     textAlign: 'center',
   },
   pinInput: {

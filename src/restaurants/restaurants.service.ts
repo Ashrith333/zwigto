@@ -20,10 +20,18 @@ export class RestaurantsService {
 
   async createRestaurant(dto: CreateRestaurantDto, userId?: string): Promise<RestaurantProfileDto> {
     // Check if user already has a restaurant
+    // Allow re-creation if previous restaurant was deleted
     if (userId) {
       const existingRestaurantUser = await this.databaseProvider.findRestaurantUserByUserId(userId);
       if (existingRestaurantUser) {
-        throw new BadRequestException('User is already linked to a restaurant. Please update your existing restaurant instead.');
+        // Check if the restaurant still exists
+        const existingRestaurant = await this.databaseProvider.findRestaurantById(existingRestaurantUser.restaurant_id);
+        if (existingRestaurant) {
+          throw new BadRequestException('User is already linked to a restaurant. Please update your existing restaurant instead.');
+        } else {
+          // Restaurant was deleted but link still exists, clean it up
+          await this.databaseProvider.deleteRestaurantUser(userId);
+        }
       }
     }
 
@@ -128,6 +136,20 @@ export class RestaurantsService {
 
   async getRestaurantForUser(userId: string): Promise<RestaurantUser | null> {
     return this.databaseProvider.findRestaurantUserByUserId(userId);
+  }
+
+  async deleteRestaurant(restaurantId: string, userId: string): Promise<void> {
+    // Verify user owns this restaurant
+    const restaurantUser = await this.databaseProvider.findRestaurantUserByUserId(userId);
+    if (!restaurantUser || restaurantUser.restaurant_id !== restaurantId) {
+      throw new ForbiddenException('You can only delete your own restaurant');
+    }
+
+    // Delete restaurant_users link first (if cascade is not set up)
+    await this.databaseProvider.deleteRestaurantUser(userId);
+    
+    // Delete restaurant (cascade should handle menu_items, orders, etc. if set up)
+    await this.databaseProvider.deleteRestaurant(restaurantId);
   }
 
   async submitChangeRequest(

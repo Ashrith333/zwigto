@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { UnifiedAuthScreen } from './src/screens/auth/UnifiedAuthScreen';
 import { RoleSelectionScreen } from './src/screens/common/RoleSelectionScreen';
+import { ProfileScreen } from './src/screens/common/ProfileScreen';
 import { UserHomeScreen } from './src/screens/user/UserHomeScreen';
 import { RouteSearchScreen } from './src/screens/user/RouteSearchScreen';
 import { OrderHistoryScreen } from './src/screens/user/OrderHistoryScreen';
@@ -43,9 +44,14 @@ export default function App() {
           options={{ headerShown: false }}
         />
         <Stack.Screen 
+          name="Profile" 
+          component={ProfileScreen}
+          options={{ title: 'Profile' }}
+        />
+        <Stack.Screen 
           name="UserHome" 
           component={UserHomeScreen}
-          options={{ title: 'Restaurants' }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen 
           name="RouteSearch" 
@@ -60,7 +66,7 @@ export default function App() {
         <Stack.Screen 
           name="RestaurantHome" 
           component={RestaurantHomeScreen}
-          options={{ title: 'Dashboard' }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen 
           name="RestaurantForm" 
@@ -75,12 +81,12 @@ export default function App() {
         <Stack.Screen 
           name="OrderManagement" 
           component={OrderManagementScreen}
-          options={{ title: 'Manage Orders' }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen 
           name="MenuManagement" 
           component={MenuManagementScreen}
-          options={{ title: 'Menu Management' }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen 
           name="RestaurantProfile" 

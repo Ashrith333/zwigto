@@ -69,6 +69,10 @@ class RestaurantService {
     return apiClient.patch<RestaurantProfile>(`/restaurants/${restaurantId}/pause`, {});
   }
 
+  async deleteRestaurant(restaurantId: string): Promise<{ message: string }> {
+    return apiClient.post<{ message: string }>(`/restaurants/${restaurantId}/delete`, {});
+  }
+
   async activateRestaurant(restaurantId: string): Promise<RestaurantProfile> {
     return apiClient.patch<RestaurantProfile>(`/restaurants/${restaurantId}/activate`, {});
   }

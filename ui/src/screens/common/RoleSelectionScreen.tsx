@@ -97,6 +97,16 @@ export const RoleSelectionScreen: React.FC = () => {
   const handleRoleSelection = async (role: UserRole) => {
     setLoading(true);
     try {
+      // Save default role if not already set
+      if (!userProfile?.default_role) {
+        try {
+          await userService.setDefaultRole(role);
+        } catch (error) {
+          console.error('Failed to save default role:', error);
+          // Continue with navigation even if save fails
+        }
+      }
+
       // Navigate based on role
       if (role === UserRole.USER) {
         (navigation as any).navigate('UserHome');

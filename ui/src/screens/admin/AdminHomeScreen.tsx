@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { adminService, restaurantService, orderService } from '../../services';
+import { theme } from '../../theme/theme';
+import { BottomNavBar } from '../../components/BottomNavBar';
 
 export const AdminHomeScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -63,10 +66,13 @@ export const AdminHomeScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Admin Dashboard</Text>
-      </View>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContent}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Admin Dashboard</Text>
+          </View>
+        </SafeAreaView>
 
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
@@ -115,25 +121,49 @@ export const AdminHomeScreen: React.FC = () => {
           <Text style={styles.actionButtonSubtext}>View payments and settlements</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+      </ScrollView>
+      <BottomNavBar currentScreen="Home" homeRoute="AdminHome" />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  safeArea: {
+    backgroundColor: theme.colors.surface,
   },
   header: {
-    padding: 20,
-    backgroundColor: '#fff',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
+    ...theme.shadows.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+    ...theme.typography.h1,
+    color: theme.colors.textPrimary,
+  },
+  profileButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#007AFF',
+  },
+  profileButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   statsGrid: {
     flexDirection: 'row',

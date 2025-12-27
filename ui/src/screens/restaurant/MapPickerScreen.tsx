@@ -641,6 +641,7 @@ export const MapPickerScreen: React.FC = () => {
             onSubmitEditing={handleSearch}
             returnKeyType="search"
             placeholderTextColor="#999"
+            blurOnSubmit={true}
             onFocus={() => {
               if (searchSuggestions.length > 0) {
                 setShowSuggestions(true);

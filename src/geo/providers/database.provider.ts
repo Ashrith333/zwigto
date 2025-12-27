@@ -18,7 +18,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       ssl: {
         rejectUnauthorized: false,
       },
-      max: 20,
+      max: 5, // Reduced to prevent connection pool exhaustion
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });

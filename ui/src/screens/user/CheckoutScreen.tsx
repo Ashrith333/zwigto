@@ -46,26 +46,24 @@ export const CheckoutScreen: React.FC = () => {
       };
 
       const order = await orderService.createOrder(orderRequest);
-      Alert.alert(
-        'Order Placed!',
-        `Your order #${order.id.substring(0, 8)} has been placed. Pay ₹${totalAmount.toFixed(2)} on pickup.`,
-        [
-          {
-            text: 'Track Order',
-            onPress: () => {
-              (navigation as any).navigate('OrderTracking', { orderId: order.id });
-            },
-          },
-        ]
-      );
-      // Clear navigation stack and go to order tracking
+      
+      // Navigate directly to order tracking screen
+      // Reset navigation stack: UserHome -> OrderTracking
       (navigation as any).reset({
-        index: 0,
+        index: 1,
         routes: [
           { name: 'UserHome' },
           { name: 'OrderTracking', params: { orderId: order.id } },
         ],
       });
+      
+      // Show success message after navigation
+      setTimeout(() => {
+        Alert.alert(
+          'Order Placed!',
+          `Your order #${order.id.substring(0, 8)} has been placed. Pay ₹${totalAmount.toFixed(2)} on pickup.`
+        );
+      }, 500);
     } catch (error: any) {
       console.error('Failed to place order:', error);
       Alert.alert('Error', error?.message || 'Failed to place order');

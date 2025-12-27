@@ -16,7 +16,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       ssl: {
         rejectUnauthorized: false,
       },
-      max: 20,
+      max: 5, // Reduced to prevent connection pool exhaustion
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
@@ -308,6 +308,27 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
     }
 
     return result.rows[0] as RestaurantUser;
+  }
+
+  async deleteRestaurantUser(userId: string): Promise<void> {
+    const query = `
+      DELETE FROM restaurant_users
+      WHERE user_id = $1
+    `;
+    await this.pool.query(query, [userId]);
+  }
+
+  async deleteRestaurant(restaurantId: string): Promise<void> {
+    // Delete restaurant (cascade will handle related records like restaurant_users, menu_items, etc.)
+    const query = `
+      DELETE FROM restaurants
+      WHERE id = $1
+    `;
+    const result: QueryResult = await this.pool.query(query, [restaurantId]);
+    
+    if (result.rowCount === 0) {
+      throw new Error('Restaurant not found');
+    }
   }
 
   async findPendingChangeRequestByRestaurantId(restaurantId: string): Promise<RestaurantChangeRequest | null> {

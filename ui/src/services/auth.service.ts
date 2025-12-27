@@ -43,8 +43,16 @@ class AuthService {
     return apiClient.post<SetPasswordResponse>('/auth/set-password', request);
   }
 
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    return apiClient.post<{ message: string }>('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+  }
+
   async logout(): Promise<void> {
     await AsyncStorage.removeItem('auth_token');
+    await AsyncStorage.removeItem('auth_user_data');
   }
 
   async getStoredToken(): Promise<string | null> {

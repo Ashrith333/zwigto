@@ -176,6 +176,8 @@ export const RouteSearchScreen: React.FC = () => {
           value={bufferMinutes}
           onChangeText={setBufferMinutes}
           keyboardType="numeric"
+          returnKeyType="done"
+          blurOnSubmit={true}
         />
         <Text style={styles.hint}>How much extra time can you spend?</Text>
       </View>

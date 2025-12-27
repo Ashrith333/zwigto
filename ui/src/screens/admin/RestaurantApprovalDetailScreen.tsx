@@ -261,11 +261,11 @@ export const RestaurantApprovalDetailScreen: React.FC = () => {
                 <TextInput
                   style={styles.reasonInput}
                   placeholder="Enter rejection reason..."
-                  multiline
-                  numberOfLines={4}
                   value={rejectionReason}
                   onChangeText={setRejectionReason}
                   placeholderTextColor="#999"
+                  returnKeyType="done"
+                  blurOnSubmit={true}
                   returnKeyType="done"
                   blurOnSubmit={true}
                 />

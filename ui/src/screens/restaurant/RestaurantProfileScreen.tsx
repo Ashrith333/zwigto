@@ -281,12 +281,12 @@ export const RestaurantProfileScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Description</Text>
         <TextInput
-          style={styles.textArea}
+          style={styles.input}
           placeholder="Describe your restaurant..."
           value={description}
           onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
+          returnKeyType="done"
+          blurOnSubmit={true}
         />
         <Text style={styles.hint}>You can edit this directly</Text>
       </View>

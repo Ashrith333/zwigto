@@ -35,7 +35,22 @@ export const UnifiedAuthScreen: React.FC = () => {
           Alert.alert('OTP Sent', 'Please enter the OTP sent to your phone');
         } else if (response.accessToken) {
           // Login successful (existing user with password)
-          (navigation as any).navigate('RoleSelection');
+          // Check if user has a default role set
+          if (response.user?.default_role) {
+            // Navigate directly to default role's home screen
+            if (response.user.default_role === 'USER') {
+              (navigation as any).navigate('UserHome');
+            } else if (response.user.default_role === 'RESTAURANT') {
+              (navigation as any).navigate('RestaurantHome');
+            } else if (response.user.default_role === 'ADMIN') {
+              (navigation as any).navigate('AdminHome');
+            } else {
+              (navigation as any).navigate('RoleSelection');
+            }
+          } else {
+            // No default role set, show role selection
+            (navigation as any).navigate('RoleSelection');
+          }
         }
       } else {
         // Second step: verify OTP and complete signup/login
@@ -47,7 +62,22 @@ export const UnifiedAuthScreen: React.FC = () => {
 
         if (response.accessToken) {
           Alert.alert('Success', 'Account created and logged in successfully!');
-          (navigation as any).navigate('RoleSelection');
+          // Check if user has a default role set (for existing users who just set password)
+          if (response.user?.default_role) {
+            // Navigate directly to default role's home screen
+            if (response.user.default_role === 'USER') {
+              (navigation as any).navigate('UserHome');
+            } else if (response.user.default_role === 'RESTAURANT') {
+              (navigation as any).navigate('RestaurantHome');
+            } else if (response.user.default_role === 'ADMIN') {
+              (navigation as any).navigate('AdminHome');
+            } else {
+              (navigation as any).navigate('RoleSelection');
+            }
+          } else {
+            // New users should see role selection
+            (navigation as any).navigate('RoleSelection');
+          }
         }
       }
     } catch (error) {
@@ -88,6 +118,8 @@ export const UnifiedAuthScreen: React.FC = () => {
             }}
             keyboardType="phone-pad"
             autoComplete="tel"
+            returnKeyType="next"
+            blurOnSubmit={true}
           />
 
           <Text style={styles.label}>Password</Text>
@@ -98,6 +130,8 @@ export const UnifiedAuthScreen: React.FC = () => {
             onChangeText={setPassword}
             secureTextEntry
             autoComplete="password"
+            returnKeyType="done"
+            blurOnSubmit={true}
           />
 
           <TouchableOpacity
@@ -124,6 +158,8 @@ export const UnifiedAuthScreen: React.FC = () => {
             onChangeText={setOtp}
             keyboardType="number-pad"
             maxLength={6}
+            returnKeyType="done"
+            blurOnSubmit={true}
             autoFocus
           />
 

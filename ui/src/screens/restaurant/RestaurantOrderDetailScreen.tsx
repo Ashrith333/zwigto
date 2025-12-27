@@ -318,11 +318,11 @@ export const RestaurantOrderDetailScreen: React.FC = () => {
                     <Text style={styles.replyInputLabel}>Your Reply:</Text>
                     <TextInput
                       style={styles.replyInput}
-                      multiline
-                      numberOfLines={4}
                       placeholder="Write your reply..."
                       value={replyText}
                       onChangeText={setReplyText}
+                      returnKeyType="done"
+                      blurOnSubmit={true}
                       returnKeyType="done"
                       blurOnSubmit={true}
                     />

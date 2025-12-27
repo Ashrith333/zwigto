@@ -86,12 +86,12 @@ export const PaymentDetailsScreen: React.FC = () => {
           Enter UPI ID, QR code details, or Bank account information
         </Text>
         <TextInput
-          style={styles.textArea}
+          style={styles.input}
           placeholder="e.g., upi@paytm or Bank: HDFC, Account: 1234567890, IFSC: HDFC0001234"
           value={paymentAccount}
           onChangeText={setPaymentAccount}
-          multiline
-          numberOfLines={4}
+          returnKeyType="done"
+          blurOnSubmit={true}
         />
         <Text style={styles.warningText}>
           ⚠️ Payment detail updates require admin approval. Changes will take effect after approval.

@@ -136,6 +136,28 @@ class ApiClient {
     }
   }
 
+  async put<T>(endpoint: string, data: any, includeAuth: boolean = true): Promise<T> {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'PUT',
+        headers: await this.getHeaders(includeAuth),
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Request failed' }));
+        throw new Error(error.message || `HTTP ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error: any) {
+      if (error.message === 'Network request failed' || error.message?.includes('Failed to connect')) {
+        throw new Error(`Cannot connect to backend at ${this.baseUrl}. Make sure the backend is running and check your API URL in .env file.`);
+      }
+      throw error;
+    }
+  }
+
   async patch<T>(endpoint: string, data: any, includeAuth: boolean = true): Promise<T> {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: 'PATCH',

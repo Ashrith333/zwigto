@@ -20,6 +20,9 @@ export class UsersService {
         phone: user.phone,
         role: user.role,
         default_pin: user.default_pin || undefined, // Include PIN for customer to see (undefined if not set)
+        default_role: user.default_role || undefined,
+        name: user.name || undefined,
+        default_addresses: user.default_addresses || undefined,
         created_at: user.created_at,
       };
     } catch (error: any) {
@@ -30,6 +33,14 @@ export class UsersService {
 
   async getUserById(userId: string): Promise<User | null> {
     return this.databaseProvider.findUserById(userId);
+  }
+
+  async setDefaultRole(userId: string, defaultRole: 'USER' | 'RESTAURANT' | 'ADMIN'): Promise<void> {
+    await this.databaseProvider.updateUserDefaultRole(userId, defaultRole);
+  }
+
+  async updateProfile(userId: string, name?: string, defaultAddresses?: any[]): Promise<void> {
+    await this.databaseProvider.updateUserProfile(userId, name, defaultAddresses);
   }
 }
 

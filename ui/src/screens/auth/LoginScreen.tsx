@@ -43,6 +43,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"
+        returnKeyType="next"
+        blurOnSubmit={true}
       />
       <TextInput
         style={styles.input}
@@ -50,6 +52,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        returnKeyType="done"
+        blurOnSubmit={true}
       />
       <TouchableOpacity
         style={[styles.button, loading && styles.buttonDisabled]}

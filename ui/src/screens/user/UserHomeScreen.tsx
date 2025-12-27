@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, RefreshControl, Linking, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, RefreshControl, Linking, Modal, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as Clipboard from 'expo-clipboard';
 import { restaurantService } from '../../services';
 import { RestaurantProfile } from '../../../shared/api-contracts';
+import { theme } from '../../theme/theme';
+import { BottomNavBar } from '../../components/BottomNavBar';
 
 export const UserHomeScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -103,15 +106,10 @@ export const UserHomeScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Restaurants</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={styles.historyButton}
-            onPress={() => (navigation as any).navigate('OrderHistory')}
-          >
-            <Text style={styles.historyButtonText}>📋 Orders</Text>
-          </TouchableOpacity>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Restaurants</Text>
+          <View style={styles.headerButtons}>
           <TouchableOpacity
             style={styles.routeButton}
             onPress={handlePickOnRoute}
@@ -119,7 +117,8 @@ export const UserHomeScreen: React.FC = () => {
             <Text style={styles.routeButtonText}>Pick on Route</Text>
           </TouchableOpacity>
         </View>
-      </View>
+        </View>
+      </SafeAreaView>
 
       {locationError && (
         <View style={styles.errorBanner}>
@@ -128,6 +127,7 @@ export const UserHomeScreen: React.FC = () => {
       )}
 
       <FlatList
+        style={styles.scrollContent}
         data={restaurants}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -264,6 +264,7 @@ export const UserHomeScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+      <BottomNavBar currentScreen="Home" />
     </View>
   );
 };
@@ -271,45 +272,64 @@ export const UserHomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  safeArea: {
+    backgroundColor: theme.colors.surface,
   },
   header: {
-    padding: 20,
-    backgroundColor: '#fff',
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
+    ...theme.shadows.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
+    ...theme.typography.h1,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.md,
   },
   headerButtons: {
     flexDirection: 'row',
     gap: 12,
   },
   historyButton: {
-    backgroundColor: '#34C759',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: theme.colors.success,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    ...theme.shadows.sm,
   },
   historyButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    color: theme.colors.textInverse,
+    ...theme.typography.captionBold,
   },
   routeButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    ...theme.shadows.sm,
   },
   routeButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+    color: theme.colors.textInverse,
+    ...theme.typography.captionBold,
+  },
+  switchRoleButton: {
+    backgroundColor: theme.colors.warning,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    ...theme.shadows.sm,
+  },
+  switchRoleButtonText: {
+    color: theme.colors.textInverse,
+    ...theme.typography.captionBold,
   },
   errorBanner: {
     backgroundColor: '#FFE5E5',
@@ -325,15 +345,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   restaurantCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 6,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: theme.spacing.md,
+    marginVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    ...theme.shadows.md,
     overflow: 'hidden',
     alignSelf: 'stretch',
   },

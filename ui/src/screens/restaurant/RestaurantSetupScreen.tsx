@@ -129,12 +129,12 @@ export const RestaurantSetupScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Description *</Text>
         <TextInput
-          style={styles.textArea}
+          style={styles.input}
           placeholder="Describe your restaurant..."
           value={description}
           onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
+          returnKeyType="next"
+          blurOnSubmit={true}
         />
       </View>
 

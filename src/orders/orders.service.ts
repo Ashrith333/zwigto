@@ -18,6 +18,7 @@ import {
 import { MenusService } from '../menus/menus.service';
 import { UsersService } from '../users/users.service';
 import { ReviewsService } from '../reviews/reviews.service';
+import { OrderEventsGateway } from './order-events.gateway';
 
 @Injectable()
 export class OrdersService {
@@ -27,6 +28,7 @@ export class OrdersService {
     private readonly usersService: UsersService,
     @Inject(forwardRef(() => ReviewsService))
     private readonly reviewsService: ReviewsService,
+    private readonly orderEventsGateway: OrderEventsGateway,
   ) {}
 
   async createOrder(userId: string, dto: CreateOrderDto): Promise<OrderDto> {
@@ -83,7 +85,14 @@ export class OrdersService {
       collection_pin: null, // No longer using per-order PIN
     });
 
-      return this.mapToDto(order, true);
+      const orderDto = this.mapToDto(order, true);
+      
+      // Emit WebSocket event for new order
+      this.orderEventsGateway.emitNewOrderToRestaurant(dto.restaurant_id, orderDto);
+      this.orderEventsGateway.emitUserOrderUpdate(userId, orderDto);
+      this.orderEventsGateway.emitOrderUpdate(order.id, orderDto);
+
+      return orderDto;
     } catch (error: any) {
       console.error('Error creating order:', error);
       throw new BadRequestException(
@@ -172,7 +181,14 @@ export class OrdersService {
       pickupTime,
     );
 
-    return this.mapToDto(updated, true);
+    const orderDto = this.mapToDto(updated, true);
+    
+    // Emit WebSocket events for order status update
+    this.orderEventsGateway.emitOrderUpdate(orderId, orderDto);
+    this.orderEventsGateway.emitUserOrderUpdate(order.user_id, orderDto);
+    this.orderEventsGateway.emitRestaurantOrderUpdate(order.restaurant_id, orderDto);
+
+    return orderDto;
   }
 
   async completePickup(orderId: string, userId: string, collectionPin?: string): Promise<OrderDto> {

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { orderService, restaurantService, authService, menuService } from '../../services';
 import { Order, RestaurantProfile, OrderStatus } from '../../../shared/api-contracts';
+import { theme } from '../../theme/theme';
+import { BottomNavBar } from '../../components/BottomNavBar';
 
 export const RestaurantHomeScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -114,6 +117,36 @@ export const RestaurantHomeScreen: React.FC = () => {
     (navigation as any).navigate('RatingAndOrderHistory');
   };
 
+  const handleDeleteRestaurant = async () => {
+    if (!restaurant) return;
+
+    Alert.alert(
+      'Delete Restaurant',
+      'Are you sure you want to delete your restaurant? This action cannot be undone. All menu items, orders, and data will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await restaurantService.deleteRestaurant(restaurant.id);
+              // Clear restaurant state and reload dashboard
+              setRestaurant(null);
+              setLoading(false);
+              // Reload dashboard to show the "no restaurant" screen with create option
+              await loadDashboard();
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete restaurant');
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleLogout = async () => {
     Alert.alert(
       'Logout',
@@ -171,17 +204,36 @@ export const RestaurantHomeScreen: React.FC = () => {
 
   if (!restaurant) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <Text style={styles.errorText}>Restaurant not found</Text>
-        <Text style={styles.errorSubtext}>
-          You are not linked to any restaurant. Please contact admin.
-        </Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={loadDashboard}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollContent}>
+          <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <View style={styles.header}>
+              <View style={styles.headerLeft}>
+                <Text style={styles.title}>Restaurant Dashboard</Text>
+                <Text style={styles.subtitle}>No restaurant found</Text>
+              </View>
+            </View>
+          </SafeAreaView>
+          <View style={styles.noRestaurantContainer}>
+            <Text style={styles.noRestaurantTitle}>No Restaurant Found</Text>
+            <Text style={styles.noRestaurantSubtext}>
+              You don't have a restaurant yet. Create one to get started!
+            </Text>
+            <TouchableOpacity
+              style={styles.createRestaurantButton}
+              onPress={() => (navigation as any).navigate('RestaurantForm')}
+            >
+              <Text style={styles.createRestaurantButtonText}>Create Restaurant</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={loadDashboard}
+            >
+              <Text style={styles.retryButtonText}>Refresh</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+        <BottomNavBar currentScreen="Home" homeRoute="RestaurantHome" />
       </View>
     );
   }
@@ -191,118 +243,136 @@ export const RestaurantHomeScreen: React.FC = () => {
   const readyOrders = todayOrders.filter(o => o.status === OrderStatus.READY);
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.title}>{restaurant.name}</Text>
-          <Text style={styles.subtitle}>Restaurant Dashboard</Text>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContent}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title}>{restaurant.name}</Text>
+            <Text style={styles.subtitle}>Restaurant Dashboard</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={[
+                styles.statusButton, 
+                restaurant.status === 'ACTIVE' 
+                  ? styles.activeButton 
+                  : restaurant.status === 'REJECTED'
+                  ? styles.rejectedButton
+                  : styles.pausedButton
+              ]}
+              onPress={handleToggleStatus}
+              disabled={restaurant.status === 'PENDING' || restaurant.status === 'REJECTED'}
+            >
+              <Text style={styles.statusButtonText}>
+                {restaurant.status === 'ACTIVE' 
+                  ? 'Open' 
+                  : restaurant.status === 'PAUSED' 
+                  ? 'Paused' 
+                  : restaurant.status === 'REJECTED'
+                  ? 'Rejected'
+                  : 'Pending'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          </View>
+        </SafeAreaView>
+
+        {restaurant.status === 'PENDING' && (
+          <View style={styles.warningBanner}>
+            <Text style={styles.warningText}>Restaurant pending admin approval</Text>
+          </View>
+        )}
+        
+        {restaurant.status === 'REJECTED' && (
+          <View style={styles.rejectedBanner}>
+            <Text style={styles.rejectedText}>❌ Restaurant has been rejected</Text>
+            {restaurant.rejection_reason && (
+              <Text style={styles.rejectionReason}>
+                Reason: {restaurant.rejection_reason}
+              </Text>
+            )}
+          </View>
+        )}
+
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{newOrders.length}</Text>
+            <Text style={styles.statLabel}>New Orders</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{preparingOrders.length}</Text>
+            <Text style={styles.statLabel}>Preparing</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{readyOrders.length}</Text>
+            <Text style={styles.statLabel}>Ready</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{todayOrders.length}</Text>
+            <Text style={styles.statLabel}>Total Today</Text>
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[
-              styles.statusButton, 
-              restaurant.status === 'ACTIVE' 
-                ? styles.activeButton 
-                : restaurant.status === 'REJECTED'
-                ? styles.rejectedButton
-                : styles.pausedButton
-            ]}
-            onPress={handleToggleStatus}
-            disabled={restaurant.status === 'PENDING' || restaurant.status === 'REJECTED'}
+
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleManageOrders}>
+            <Text style={styles.actionButtonText}>📦 Manage Orders</Text>
+            <Text style={styles.actionButtonSubtext}>View and update order status</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton} onPress={handleManageMenu}>
+            <Text style={styles.actionButtonText}>🍽️ Manage Menu</Text>
+            <Text style={styles.actionButtonSubtext}>Add, edit, or remove items</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton} onPress={handleEditRestaurant}>
+            <Text style={styles.actionButtonText}>✏️ Edit Restaurant</Text>
+            <Text style={styles.actionButtonSubtext}>Edit all restaurant details including payment info</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton} onPress={handleRatingAndOrderHistory}>
+            <Text style={styles.actionButtonText}>⭐ Rating and Order History</Text>
+            <Text style={styles.actionButtonSubtext}>View ratings, reviews, and order history</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.deleteButton]} 
+            onPress={handleDeleteRestaurant}
           >
-            <Text style={styles.statusButtonText}>
-              {restaurant.status === 'ACTIVE' 
-                ? 'Open' 
-                : restaurant.status === 'PAUSED' 
-                ? 'Paused' 
-                : restaurant.status === 'REJECTED'
-                ? 'Rejected'
-                : 'Pending'}
+            <Text style={[styles.actionButtonText, styles.deleteButtonText]}>🗑️ Delete Restaurant</Text>
+            <Text style={[styles.actionButtonSubtext, styles.deleteButtonSubtext]}>
+              Permanently delete your restaurant and all associated data
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={handleLogout}
-          >
-            <Text style={styles.logoutButtonText}>Logout</Text>
-          </TouchableOpacity>
         </View>
-      </View>
-
-      {restaurant.status === 'PENDING' && (
-        <View style={styles.warningBanner}>
-          <Text style={styles.warningText}>Restaurant pending admin approval</Text>
-        </View>
-      )}
-      
-      {restaurant.status === 'REJECTED' && (
-        <View style={styles.rejectedBanner}>
-          <Text style={styles.rejectedText}>❌ Restaurant has been rejected</Text>
-          {restaurant.rejection_reason && (
-            <Text style={styles.rejectionReason}>
-              Reason: {restaurant.rejection_reason}
-            </Text>
-          )}
-        </View>
-      )}
-
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{newOrders.length}</Text>
-          <Text style={styles.statLabel}>New Orders</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{preparingOrders.length}</Text>
-          <Text style={styles.statLabel}>Preparing</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{readyOrders.length}</Text>
-          <Text style={styles.statLabel}>Ready</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{todayOrders.length}</Text>
-          <Text style={styles.statLabel}>Total Today</Text>
-        </View>
-      </View>
-
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleManageOrders}>
-          <Text style={styles.actionButtonText}>📦 Manage Orders</Text>
-          <Text style={styles.actionButtonSubtext}>View and update order status</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={handleManageMenu}>
-          <Text style={styles.actionButtonText}>🍽️ Manage Menu</Text>
-          <Text style={styles.actionButtonSubtext}>Add, edit, or remove items</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={handleEditRestaurant}>
-          <Text style={styles.actionButtonText}>✏️ Edit Restaurant</Text>
-          <Text style={styles.actionButtonSubtext}>Edit all restaurant details including payment info</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={handleRatingAndOrderHistory}>
-          <Text style={styles.actionButtonText}>⭐ Rating and Order History</Text>
-          <Text style={styles.actionButtonSubtext}>View ratings, reviews, and order history</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </ScrollView>
+      <BottomNavBar currentScreen="Home" homeRoute="RestaurantHome" />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  safeArea: {
+    backgroundColor: theme.colors.surface,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: 20,
-    backgroundColor: '#fff',
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
+    ...theme.shadows.sm,
   },
   headerLeft: {
     flex: 1,
@@ -312,9 +382,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+    ...theme.typography.h1,
+    color: theme.colors.textPrimary,
   },
   logoutButton: {
     paddingHorizontal: 12,
@@ -325,6 +394,18 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     color: '#FF3B30',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  profileButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#007AFF',
+    marginBottom: 8,
+  },
+  profileButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
   statusButton: {
@@ -414,14 +495,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   actionButton: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.lg,
+    marginBottom: theme.spacing.md,
+    ...theme.shadows.md,
   },
   actionButtonText: {
     fontSize: 18,
@@ -432,6 +510,18 @@ const styles = StyleSheet.create({
   actionButtonSubtext: {
     fontSize: 14,
     color: '#666',
+  },
+  deleteButton: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#FF3B30',
+  },
+  deleteButtonText: {
+    color: '#FF3B30',
+  },
+  deleteButtonSubtext: {
+    color: '#FF3B30',
+    opacity: 0.8,
   },
   recentOrdersContainer: {
     padding: 16,
@@ -495,6 +585,37 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  noRestaurantContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  noRestaurantTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  noRestaurantSubtext: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  createRestaurantButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  createRestaurantButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 

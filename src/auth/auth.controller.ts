@@ -12,6 +12,7 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { SetPasswordDto } from './dto/set-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UnifiedAuthDto } from './dto/unified-auth.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { Public } from './decorators/public.decorator';
@@ -50,6 +51,16 @@ export class AuthController {
     @Body() dto: SetPasswordDto,
   ): Promise<{ message: string }> {
     return this.authService.setPassword(req.user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Request() req: any,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    return this.authService.changePassword(req.user.id, dto.current_password, dto.new_password);
   }
 
   @Public()

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert, Switch, Modal, Image, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert, Switch, Modal, Image, ScrollView, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { menuService, restaurantService } from '../../services';
 import { MenuItem, CreateMenuItemRequest, UpdateMenuItemRequest, FoodType } from '../../../shared/api-contracts';
+import { theme } from '../../theme/theme';
 
 // Define FoodType values as constants to avoid enum import issues
 const FOOD_TYPE_VEG = 'VEG';
@@ -185,12 +187,14 @@ export const MenuManagementScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Menu Management</Text>
-        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <Text style={styles.addButtonText}>+ Add Item</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Menu Management</Text>
+          <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
+            <Text style={styles.addButtonText}>+ Add Item</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
 
       <FlatList
         data={menuItems}
@@ -256,125 +260,158 @@ export const MenuManagementScreen: React.FC = () => {
         }
       />
 
-      <Modal visible={showAddModal} animationType="slide" transparent>
+      <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={() => {
+        setShowAddModal(false);
+        resetForm();
+        Keyboard.dismiss();
+      }}>
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalScrollView} contentContainerStyle={styles.modalScrollContent}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>
-                {editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
-              </Text>
+          <SafeAreaView style={styles.safeAreaModal} edges={['top', 'bottom']}>
+            <KeyboardAvoidingView
+              style={styles.keyboardAvoidingView}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+              <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={styles.modalContainer}>
+                  <TouchableWithoutFeedback>
+                    <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>
+                      {editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
+                    </Text>
 
-              <Text style={styles.label}>Item Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Margherita Pizza"
-                value={name}
-                onChangeText={setName}
-              />
+                    <ScrollView
+                      style={styles.modalScrollView}
+                      contentContainerStyle={styles.modalScrollContent}
+                      keyboardShouldPersistTaps="handled"
+                      showsVerticalScrollIndicator={true}
+                    >
+                      <Text style={styles.label}>Item Name *</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="e.g., Margherita Pizza"
+                        value={name}
+                        onChangeText={setName}
+                        returnKeyType="next"
+                        blurOnSubmit={true}
+                      />
 
-              <Text style={styles.label}>Description</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Item description..."
-                value={description}
-                onChangeText={setDescription}
-                multiline
-              />
+                      <Text style={styles.label}>Description</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Item description..."
+                        value={description}
+                        onChangeText={setDescription}
+                        returnKeyType="next"
+                        blurOnSubmit={true}
+                      />
 
-              <View style={styles.row}>
-                <View style={styles.halfInput}>
-                  <Text style={styles.label}>Price (₹) *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="0"
-                    value={price}
-                    onChangeText={setPrice}
-                    keyboardType="numeric"
-                  />
+                      <View style={styles.row}>
+                        <View style={styles.halfInput}>
+                          <Text style={styles.label}>Price (₹) *</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="0"
+                            value={price}
+                            onChangeText={setPrice}
+                            keyboardType="numeric"
+                            returnKeyType="next"
+                            blurOnSubmit={true}
+                          />
+                        </View>
+                        <View style={styles.halfInput}>
+                          <Text style={styles.label}>Avg Prep Time (min) *</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="15"
+                            value={prepTime}
+                            onChangeText={setPrepTime}
+                            keyboardType="numeric"
+                            returnKeyType="next"
+                            blurOnSubmit={true}
+                          />
+                        </View>
+                      </View>
+
+                      <Text style={styles.label}>Food Type *</Text>
+                      <View style={styles.foodTypeRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.foodTypeButton,
+                            foodType === FOOD_TYPE_VEG && styles.foodTypeButtonActive,
+                          ]}
+                          onPress={() => setFoodType(FOOD_TYPE_VEG as FoodType)}
+                        >
+                          <Text style={[
+                            styles.foodTypeButtonText,
+                            foodType === FOOD_TYPE_VEG && styles.foodTypeButtonTextActive,
+                          ]}>
+                            🟢 Veg
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.foodTypeButton,
+                            foodType === FOOD_TYPE_NON_VEG && styles.foodTypeButtonActive,
+                          ]}
+                          onPress={() => setFoodType(FOOD_TYPE_NON_VEG as FoodType)}
+                        >
+                          <Text style={[
+                            styles.foodTypeButtonText,
+                            foodType === FOOD_TYPE_NON_VEG && styles.foodTypeButtonTextActive,
+                          ]}>
+                            🔴 Non-Veg
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <Text style={styles.label}>Photo URL (Optional)</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="https://example.com/image.jpg"
+                        value={imageUrl}
+                        onChangeText={setImageUrl}
+                        keyboardType="url"
+                        autoCapitalize="none"
+                        returnKeyType="done"
+                        blurOnSubmit={true}
+                      />
+                      {imageUrl && (
+                        <Image source={{ uri: imageUrl }} style={styles.previewImage} />
+                      )}
+
+                      <View style={styles.switchRow}>
+                        <Text style={styles.label}>Available</Text>
+                        <Switch value={isAvailable} onValueChange={setIsAvailable} />
+                      </View>
+                    </ScrollView>
+
+                    <View style={styles.modalActions}>
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.cancelButton]}
+                        onPress={() => {
+                          setShowAddModal(false);
+                          resetForm();
+                          Keyboard.dismiss();
+                        }}
+                      >
+                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.saveButton]}
+                        onPress={handleSave}
+                      >
+                        <Text style={styles.saveButtonText}>
+                          {editingItem ? 'Update' : 'Add'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    </View>
+                  </TouchableWithoutFeedback>
                 </View>
-                <View style={styles.halfInput}>
-                  <Text style={styles.label}>Avg Prep Time (min) *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="15"
-                    value={prepTime}
-                    onChangeText={setPrepTime}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.label}>Food Type *</Text>
-              <View style={styles.foodTypeRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.foodTypeButton,
-                    foodType === FOOD_TYPE_VEG && styles.foodTypeButtonActive,
-                  ]}
-                  onPress={() => setFoodType(FOOD_TYPE_VEG as FoodType)}
-                >
-                  <Text style={[
-                    styles.foodTypeButtonText,
-                    foodType === FOOD_TYPE_VEG && styles.foodTypeButtonTextActive,
-                  ]}>
-                    🟢 Veg
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.foodTypeButton,
-                    foodType === FOOD_TYPE_NON_VEG && styles.foodTypeButtonActive,
-                  ]}
-                  onPress={() => setFoodType(FOOD_TYPE_NON_VEG as FoodType)}
-                >
-                  <Text style={[
-                    styles.foodTypeButtonText,
-                    foodType === FOOD_TYPE_NON_VEG && styles.foodTypeButtonTextActive,
-                  ]}>
-                    🔴 Non-Veg
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.label}>Photo URL (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="https://example.com/image.jpg"
-                value={imageUrl}
-                onChangeText={setImageUrl}
-                keyboardType="url"
-                autoCapitalize="none"
-              />
-              {imageUrl && (
-                <Image source={{ uri: imageUrl }} style={styles.previewImage} />
-              )}
-
-              <View style={styles.switchRow}>
-                <Text style={styles.label}>Available</Text>
-                <Switch value={isAvailable} onValueChange={setIsAvailable} />
-              </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowAddModal(false);
-                  resetForm();
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSave}
-              >
-                <Text style={styles.saveButtonText}>
-                  {editingItem ? 'Update' : 'Add'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            </View>
-          </ScrollView>
+              </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
         </View>
       </Modal>
     </View>
@@ -384,44 +421,47 @@ export const MenuManagementScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
+  },
+  safeArea: {
+    backgroundColor: theme.colors.surface,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
+    ...theme.shadows.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+    ...theme.typography.h2,
+    color: theme.colors.textPrimary,
+    flex: 1,
   },
   addButton: {
-    backgroundColor: '#34C759',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: theme.colors.success,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    marginLeft: theme.spacing.md,
+    ...theme.shadows.sm,
   },
   addButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+    color: theme.colors.textInverse,
+    ...theme.typography.captionBold,
   },
   menuItemCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.md,
+    marginHorizontal: theme.spacing.md,
+    marginVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    ...theme.shadows.md,
   },
   disabledCard: {
     opacity: 0.7,
@@ -473,20 +513,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuItemName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    ...theme.typography.h3,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.xs,
   },
   menuItemPrice: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    ...theme.typography.bodyBold,
+    color: theme.colors.primary,
   },
   menuItemDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.sm,
   },
   menuItemFooter: {
     flexDirection: 'row',
@@ -506,26 +544,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   editButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
   },
   editButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: theme.colors.textInverse,
+    ...theme.typography.smallBold,
   },
   deleteButton: {
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    backgroundColor: theme.colors.error,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
   },
   deleteButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: theme.colors.textInverse,
+    ...theme.typography.smallBold,
   },
   emptyContainer: {
     padding: 40,
@@ -541,18 +577,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalScrollView: {
+  safeAreaModal: {
+    flex: 1,
     width: '100%',
-  },
-  modalScrollContent: {
+    justifyContent: 'center',
     alignItems: 'center',
   },
+  keyboardAvoidingView: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '100%',
+    paddingHorizontal: theme.spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    maxWidth: 500,
+  },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    width: '100%',
+    maxHeight: '85%',
+    ...theme.shadows.lg,
+  },
+  modalScrollView: {
+    maxHeight: 400,
+  },
+  modalScrollContent: {
+    paddingBottom: theme.spacing.md,
+    flexGrow: 1,
   },
   foodTypeRow: {
     flexDirection: 'row',
@@ -589,25 +646,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
+    ...theme.typography.h2,
+    marginBottom: theme.spacing.lg,
+    color: theme.colors.textPrimary,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
+    ...theme.typography.captionBold,
+    marginBottom: theme.spacing.sm,
+    color: theme.colors.textPrimary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 16,
-    marginBottom: 16,
-    backgroundColor: '#fff',
+    borderColor: theme.colors.border,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    ...theme.typography.body,
+    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
   },
   textArea: {
     minHeight: 80,
@@ -624,12 +679,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: theme.spacing.md,
+    marginTop: theme.spacing.sm,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   modalButton: {
     flex: 1,
@@ -645,11 +704,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   saveButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: theme.colors.success,
   },
   saveButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: theme.colors.textInverse,
+    ...theme.typography.captionBold,
   },
 });
 

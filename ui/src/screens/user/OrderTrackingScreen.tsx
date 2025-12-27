@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
-import { orderService, userService, reviewService } from '../../services';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { orderService, userService, reviewService, websocketService } from '../../services';
 import { Order, OrderStatus } from '../../../shared/api-contracts';
+import { theme } from '../../theme/theme';
 
 export const OrderTrackingScreen: React.FC = () => {
   const route = useRoute();
@@ -22,11 +23,36 @@ export const OrderTrackingScreen: React.FC = () => {
     loadUserPin();
     if (orderId) {
       loadOrder();
+      
+      // Subscribe to WebSocket updates for this order
+      websocketService.subscribeToOrder(orderId, (updatedOrder) => {
+        setOrder(updatedOrder);
+      }).catch((error) => {
+        console.error('Failed to subscribe to order updates:', error);
+      });
     } else {
       // If no orderId, show all user orders
       loadMyOrders();
     }
+    
+    return () => {
+      // Unsubscribe from WebSocket when component unmounts
+      if (orderId) {
+        websocketService.unsubscribeFromOrder(orderId).catch(console.error);
+      }
+    };
   }, [orderId]);
+  
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (orderId) {
+        loadOrder();
+      } else {
+        loadMyOrders();
+      }
+    }, [orderId])
+  );
 
   const loadUserPin = async () => {
     try {
@@ -88,8 +114,9 @@ export const OrderTrackingScreen: React.FC = () => {
           disabled={!interactive}
           onPress={() => onPress && onPress(i)}
           style={styles.starButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={styles.star}>{i <= ratingValue ? '⭐' : '☆'}</Text>
+          <Text style={interactive ? styles.starInteractive : styles.star}>{i <= ratingValue ? '⭐' : '☆'}</Text>
         </TouchableOpacity>
       );
     }
@@ -183,88 +210,89 @@ export const OrderTrackingScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.statusCard}>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
-        </View>
-        <Text style={styles.orderId}>Order #{order.id.substring(0, 8)}</Text>
-      </View>
-
-      {order.estimated_ready_time && order.status !== 'PICKED_UP' && order.status !== 'CANCELLED' && (
-        <View style={styles.etaCard}>
-          <Text style={styles.etaLabel}>Estimated Ready Time</Text>
-          <Text style={styles.etaTime}>{formatTime(order.estimated_ready_time)}</Text>
-        </View>
-      )}
-
-      {order.items && order.items.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Order Items</Text>
-          {order.items.map((item) => (
-            <View key={item.id} style={styles.orderItem}>
-              <View style={styles.orderItemInfo}>
-                <Text style={styles.orderItemName}>{item.menu_item_name || 'Item'}</Text>
-                <Text style={styles.orderItemQuantity}>Qty: {item.quantity}</Text>
-              </View>
-              <Text style={styles.orderItemPrice}>₹{(item.price * item.quantity).toFixed(2)}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      <View style={styles.section}>
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Total Amount</Text>
-          <Text style={styles.totalAmount}>₹{order.total_amount.toFixed(2)}</Text>
-        </View>
-        <Text style={styles.paymentMethod}>
-          {order.payment_method === 'CASH_ON_PICKUP' ? '💵 Cash on Pickup' : '💳 Online Payment'}
-        </Text>
-      </View>
-
-      {order.status === 'READY' && userPin && (
-        <View style={styles.pinCard}>
-          <Text style={styles.pinLabel}>Your Default PIN</Text>
-          <Text style={styles.pinValue}>{userPin}</Text>
-          <Text style={styles.pinNote}>Show this 4-digit PIN to the restaurant when collecting your order</Text>
-          <Text style={styles.pinNoteSmall}>Note: Restaurant will verify your PIN before marking order as picked up</Text>
-        </View>
-      )}
-
-      {/* Rating Section for Picked Up Orders */}
-      {order.status === OrderStatus.PICKED_UP && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Review & Rating</Text>
-          {order.review ? (
-            <View style={styles.reviewCard}>
-              <Text style={styles.reviewLabel}>Your Review:</Text>
-              {renderStars(order.review.rating)}
-              {order.review.comment && (
-                <Text style={styles.reviewComment}>{order.review.comment}</Text>
-              )}
-              {order.review.restaurant_reply && (
-                <View style={styles.replyContainer}>
-                  <Text style={styles.replyLabel}>Restaurant Reply:</Text>
-                  <Text style={styles.replyText}>{order.review.restaurant_reply}</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.rateButton}
-              onPress={handleRateOrder}
-            >
-              <Text style={styles.rateButtonText}>Rate this Order</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      <FlatList
-        data={[]}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={null}
-      />
+        showsVerticalScrollIndicator={true}
+      >
+        <View style={styles.statusCard}>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
+            <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
+          </View>
+          <Text style={styles.orderId}>Order #{order.id.substring(0, 8)}</Text>
+        </View>
+
+        {order.estimated_ready_time && order.status !== 'PICKED_UP' && order.status !== 'CANCELLED' && (
+          <View style={styles.etaCard}>
+            <Text style={styles.etaLabel}>Estimated Ready Time</Text>
+            <Text style={styles.etaTime}>{formatTime(order.estimated_ready_time)}</Text>
+          </View>
+        )}
+
+        {order.items && order.items.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Order Items</Text>
+            {order.items.map((item) => (
+              <View key={item.id} style={styles.orderItem}>
+                <View style={styles.orderItemInfo}>
+                  <Text style={styles.orderItemName}>{item.menu_item_name || 'Item'}</Text>
+                  <Text style={styles.orderItemQuantity}>Qty: {item.quantity}</Text>
+                </View>
+                <Text style={styles.orderItemPrice}>₹{(item.price * item.quantity).toFixed(2)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalAmount}>₹{order.total_amount.toFixed(2)}</Text>
+          </View>
+          <Text style={styles.paymentMethod}>
+            {order.payment_method === 'CASH_ON_PICKUP' ? '💵 Cash on Pickup' : '💳 Online Payment'}
+          </Text>
+        </View>
+
+        {order.status === 'READY' && userPin && (
+          <View style={styles.pinCard}>
+            <Text style={styles.pinLabel}>Your Default PIN</Text>
+            <Text style={styles.pinValue}>{userPin}</Text>
+            <Text style={styles.pinNote}>Show this 4-digit PIN to the restaurant when collecting your order</Text>
+            <Text style={styles.pinNoteSmall}>Note: Restaurant will verify your PIN before marking order as picked up</Text>
+          </View>
+        )}
+
+        {/* Rating Section for Picked Up Orders */}
+        {order.status === OrderStatus.PICKED_UP && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Review & Rating</Text>
+            {order.review ? (
+              <View style={styles.reviewCard}>
+                <Text style={styles.reviewLabel}>Your Review:</Text>
+                {renderStars(order.review.rating)}
+                {order.review.comment && (
+                  <Text style={styles.reviewComment}>{order.review.comment}</Text>
+                )}
+                {order.review.restaurant_reply && (
+                  <View style={styles.replyContainer}>
+                    <Text style={styles.replyLabel}>Restaurant Reply:</Text>
+                    <Text style={styles.replyText}>{order.review.restaurant_reply}</Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.rateButton}
+                onPress={handleRateOrder}
+              >
+                <Text style={styles.rateButtonText}>Rate this Order</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </ScrollView>
 
       {/* Rating Modal */}
       <Modal
@@ -290,20 +318,30 @@ export const OrderTrackingScreen: React.FC = () => {
                   <Text style={styles.modalTitle}>Rate Your Order</Text>
                   <Text style={styles.modalSubtitle}>Order #{order?.id.slice(0, 8)}</Text>
                   
-                  <Text style={styles.ratingLabel}>Rating:</Text>
-                  {renderStars(rating, true, setRating)}
+                  <View style={styles.ratingSection}>
+                    <Text style={styles.ratingLabel}>How was your experience?</Text>
+                    <View style={styles.starsContainer}>
+                      {renderStars(rating, true, setRating)}
+                    </View>
+                    {rating > 0 && (
+                      <Text style={styles.ratingHint}>
+                        {rating === 1 ? 'Poor' : rating === 2 ? 'Fair' : rating === 3 ? 'Good' : rating === 4 ? 'Very Good' : 'Excellent'}
+                      </Text>
+                    )}
+                  </View>
                   
-                  <Text style={styles.commentLabel}>Feedback (optional):</Text>
-                  <TextInput
-                    style={styles.commentInput}
-                    multiline
-                    numberOfLines={4}
-                    placeholder="Share your experience..."
-                    value={comment}
-                    onChangeText={setComment}
-                    returnKeyType="done"
-                    blurOnSubmit={true}
-                  />
+                  <View style={styles.commentSection}>
+                    <Text style={styles.commentLabel}>Share your feedback (optional)</Text>
+                    <TextInput
+                      style={styles.commentInput}
+                      placeholder="Tell us about your experience with this order..."
+                      value={comment}
+                      onChangeText={setComment}
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      multiline={false}
+                    />
+                  </View>
                   
                   <View style={styles.modalButtons}>
                     <TouchableOpacity
@@ -341,6 +379,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   centerContainer: {
     flex: 1,
@@ -500,13 +544,21 @@ const styles = StyleSheet.create({
   },
   starsRow: {
     flexDirection: 'row',
-    marginVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+    paddingVertical: 12,
   },
   starButton: {
-    marginHorizontal: 4,
+    marginHorizontal: 8,
+    padding: 8,
   },
   star: {
-    fontSize: 28,
+    fontSize: 32,
+  },
+  starInteractive: {
+    fontSize: 36,
   },
   reviewComment: {
     fontSize: 14,
@@ -559,52 +611,81 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 24,
-    width: '90%',
+    padding: 20,
+    width: '85%',
     maxWidth: 400,
-    maxHeight: '90%',
+    maxHeight: '80%',
+    ...theme.shadows.md,
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 4,
+    color: '#333',
+    textAlign: 'center',
   },
   modalSubtitle: {
     fontSize: 14,
     color: '#666',
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  ratingSection: {
+    marginBottom: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    alignItems: 'center',
   },
   ratingLabel: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
+    color: '#333',
+    textAlign: 'center',
+  },
+  starsContainer: {
+    marginBottom: 6,
+  },
+  ratingHint: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2196F3',
+    marginTop: 4,
+  },
+  commentSection: {
+    marginTop: 2,
   },
   commentLabel: {
     fontSize: 16,
     fontWeight: '600',
-    marginTop: 20,
     marginBottom: 10,
+    color: '#333',
   },
   commentInput: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
-    minHeight: 100,
+    minHeight: 80,
     textAlignVertical: 'top',
     fontSize: 14,
+    backgroundColor: '#fff',
+    marginBottom: 2,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
+    gap: 10,
   },
   modalButton: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginHorizontal: 5,
+    ...theme.shadows.sm,
   },
   cancelButton: {
     backgroundColor: '#e0e0e0',
@@ -615,10 +696,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   submitButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#34C759',
   },
   submitButtonDisabled: {
     backgroundColor: '#ccc',
+    opacity: 0.6,
   },
   submitButtonText: {
     color: '#fff',

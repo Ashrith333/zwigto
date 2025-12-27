@@ -19,7 +19,7 @@ export class SupabaseProvider implements OnModuleInit, OnModuleDestroy {
       ssl: {
         rejectUnauthorized: false,
       },
-      max: 20,
+      max: 5, // Reduced to prevent connection pool exhaustion
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
     });
@@ -48,7 +48,14 @@ export class SupabaseProvider implements OnModuleInit, OnModuleDestroy {
   async findUserByPhone(phone: string): Promise<User | null> {
     try {
       const query = `
-        SELECT id, phone, password_hash, role
+        SELECT 
+          id, 
+          phone, 
+          password_hash, 
+          role,
+          COALESCE(default_role, NULL) as default_role,
+          COALESCE(name, NULL) as name,
+          COALESCE(default_addresses, '[]'::jsonb) as default_addresses
         FROM users
         WHERE phone = $1
         LIMIT 1
@@ -60,7 +67,17 @@ export class SupabaseProvider implements OnModuleInit, OnModuleDestroy {
         return null;
       }
 
-      return result.rows[0] as User;
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        phone: row.phone,
+        password_hash: row.password_hash,
+        role: row.role,
+        default_pin: row.default_pin || null,
+        default_role: row.default_role || null,
+        name: row.name || null,
+        default_addresses: row.default_addresses || null,
+      } as User;
     } catch (error: any) {
       const errorMessage = error?.message || 'Unknown error';
       if (errorMessage.includes('Circuit breaker')) {
@@ -69,6 +86,30 @@ export class SupabaseProvider implements OnModuleInit, OnModuleDestroy {
       if (errorMessage.includes('password authentication failed')) {
         throw new Error('Database authentication failed. Please verify DATABASE_URL password in .env file.');
       }
+      // If columns don't exist, try fallback query
+      if (errorMessage.includes('column') && errorMessage.includes('does not exist')) {
+        const fallbackQuery = `
+          SELECT id, phone, password_hash, role, COALESCE(default_pin, NULL) as default_pin
+          FROM users
+          WHERE phone = $1
+          LIMIT 1
+        `;
+        const result: QueryResult = await this.pool.query(fallbackQuery, [phone]);
+        if (result.rows.length === 0) {
+          return null;
+        }
+        const row = result.rows[0];
+        return {
+          id: row.id,
+          phone: row.phone,
+          password_hash: row.password_hash,
+          role: row.role,
+          default_pin: row.default_pin || null,
+          default_role: null,
+          name: null,
+          default_addresses: null,
+        } as User;
+      }
       throw new Error(`Database error: ${errorMessage}`);
     }
   }
@@ -76,7 +117,15 @@ export class SupabaseProvider implements OnModuleInit, OnModuleDestroy {
   async findUserById(id: string): Promise<User | null> {
     try {
       const query = `
-        SELECT id, phone, password_hash, role, default_pin
+        SELECT 
+          id, 
+          phone, 
+          password_hash, 
+          role, 
+          COALESCE(default_pin, NULL) as default_pin,
+          COALESCE(default_role, NULL) as default_role,
+          COALESCE(name, NULL) as name,
+          COALESCE(default_addresses, '[]'::jsonb) as default_addresses
         FROM users
         WHERE id = $1
         LIMIT 1
@@ -88,7 +137,17 @@ export class SupabaseProvider implements OnModuleInit, OnModuleDestroy {
         return null;
       }
 
-      return result.rows[0] as User;
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        phone: row.phone,
+        password_hash: row.password_hash,
+        role: row.role,
+        default_pin: row.default_pin || null,
+        default_role: row.default_role || null,
+        name: row.name || null,
+        default_addresses: row.default_addresses || null,
+      } as User;
     } catch (error: any) {
       const errorMessage = error?.message || 'Unknown error';
       if (errorMessage.includes('Circuit breaker')) {
@@ -96,6 +155,30 @@ export class SupabaseProvider implements OnModuleInit, OnModuleDestroy {
       }
       if (errorMessage.includes('password authentication failed')) {
         throw new Error('Database authentication failed. Please verify DATABASE_URL password in .env file.');
+      }
+      // If columns don't exist, try fallback query
+      if (errorMessage.includes('column') && errorMessage.includes('does not exist')) {
+        const fallbackQuery = `
+          SELECT id, phone, password_hash, role, COALESCE(default_pin, NULL) as default_pin
+          FROM users
+          WHERE id = $1
+          LIMIT 1
+        `;
+        const result: QueryResult = await this.pool.query(fallbackQuery, [id]);
+        if (result.rows.length === 0) {
+          return null;
+        }
+        const row = result.rows[0];
+        return {
+          id: row.id,
+          phone: row.phone,
+          password_hash: row.password_hash,
+          role: row.role,
+          default_pin: row.default_pin || null,
+          default_role: null,
+          name: null,
+          default_addresses: null,
+        } as User;
       }
       throw new Error(`Database error: ${errorMessage}`);
     }

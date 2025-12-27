@@ -16,7 +16,7 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       ssl: {
         rejectUnauthorized: false,
       },
-      max: 20,
+      max: 5, // Reduced to prevent connection pool exhaustion
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
@@ -43,9 +43,16 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
 
   async findUserById(id: string): Promise<User | null> {
     try {
-      // Check if default_pin column exists, if not, use COALESCE to return null
       const query = `
-        SELECT id, phone, role, COALESCE(default_pin, NULL) as default_pin, created_at
+        SELECT 
+          id, 
+          phone, 
+          role, 
+          COALESCE(default_pin, NULL) as default_pin,
+          COALESCE(default_role, NULL) as default_role,
+          COALESCE(name, NULL) as name,
+          COALESCE(default_addresses, '[]'::jsonb) as default_addresses,
+          created_at
         FROM users
         WHERE id = $1
         LIMIT 1
@@ -63,15 +70,18 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
         phone: row.phone,
         role: row.role,
         default_pin: row.default_pin || null,
+        default_role: row.default_role || null,
+        name: row.name || null,
+        default_addresses: row.default_addresses || null,
         created_at: row.created_at,
       } as User;
     } catch (error: any) {
       const errorMessage = error?.message || 'Unknown error';
-      // If column doesn't exist, try without it
-      if (errorMessage.includes('column "default_pin" does not exist')) {
-        console.warn('⚠️  default_pin column does not exist. Please run ADD_USER_DEFAULT_PIN.sql migration.');
+      // If columns don't exist, try with fallback
+      if (errorMessage.includes('column') && errorMessage.includes('does not exist')) {
+        console.warn('⚠️  Some columns may not exist. Please run ADD_USER_PROFILE_FIELDS.sql migration.');
         const fallbackQuery = `
-          SELECT id, phone, role, created_at
+          SELECT id, phone, role, COALESCE(default_pin, NULL) as default_pin, created_at
           FROM users
           WHERE id = $1
           LIMIT 1
@@ -85,9 +95,74 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
           id: row.id,
           phone: row.phone,
           role: row.role,
-          default_pin: null,
+          default_pin: row.default_pin || null,
+          default_role: null,
+          name: null,
+          default_addresses: null,
           created_at: row.created_at,
         } as User;
+      }
+      throw error;
+    }
+  }
+
+  async updateUserDefaultRole(userId: string, defaultRole: string): Promise<void> {
+    try {
+      const query = `
+        UPDATE users
+        SET default_role = $1
+        WHERE id = $2
+      `;
+      await this.pool.query(query, [defaultRole, userId]);
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Unknown error';
+      if (errorMessage.includes('column') && errorMessage.includes('does not exist')) {
+        console.warn('⚠️  default_role column does not exist. Please run ADD_USER_PROFILE_FIELDS.sql migration.');
+        throw new Error('Database migration required. Please run ADD_USER_PROFILE_FIELDS.sql migration.');
+      }
+      throw error;
+    }
+  }
+
+  async updateUserProfile(userId: string, name?: string, defaultAddresses?: any[]): Promise<void> {
+    try {
+      const updates: string[] = [];
+      const values: any[] = [];
+      let paramIndex = 1;
+
+      if (name !== undefined) {
+        updates.push(`name = $${paramIndex++}`);
+        values.push(name);
+      }
+
+      if (defaultAddresses !== undefined) {
+        updates.push(`default_addresses = $${paramIndex++}::jsonb`);
+        values.push(JSON.stringify(defaultAddresses));
+      }
+
+      if (updates.length === 0) {
+        return; // No updates to make
+      }
+
+      values.push(userId);
+      const query = `
+        UPDATE users
+        SET ${updates.join(', ')}
+        WHERE id = $${paramIndex}
+      `;
+      await this.pool.query(query, values);
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Unknown error';
+      if (errorMessage.includes('column') && errorMessage.includes('does not exist')) {
+        console.warn('⚠️  Some profile columns may not exist. Please run ADD_USER_PROFILE_FIELDS.sql migration.');
+        // If name column doesn't exist but we're trying to update it, throw a helpful error
+        if (name !== undefined && errorMessage.includes('name')) {
+          throw new Error('Database migration required. Please run ADD_USER_PROFILE_FIELDS.sql migration to enable name updates.');
+        }
+        // For other columns, just log and continue
+        if (defaultAddresses !== undefined && errorMessage.includes('default_addresses')) {
+          throw new Error('Database migration required. Please run ADD_USER_PROFILE_FIELDS.sql migration to enable address updates.');
+        }
       }
       throw error;
     }
