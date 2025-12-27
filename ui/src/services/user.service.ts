@@ -16,6 +16,10 @@ class UserService {
       default_addresses: defaultAddresses,
     });
   }
+
+  async regeneratePin(): Promise<{ message: string; pin: string }> {
+    return apiClient.put<{ message: string; pin: string }>('/users/me/regenerate-pin', {});
+  }
 }
 
 export const userService = new UserService();

@@ -167,5 +167,44 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
   }
+
+  async regenerateUserPin(userId: string): Promise<string> {
+    try {
+      // Generate a new 4-digit PIN
+      const newPin = Math.floor(1000 + Math.random() * 9000).toString();
+      
+      const query = `
+        UPDATE users
+        SET default_pin = $1
+        WHERE id = $2
+        RETURNING default_pin
+      `;
+      const result = await this.pool.query(query, [newPin, userId]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('User not found');
+      }
+      
+      return newPin;
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Unknown error';
+      if (errorMessage.includes('column') && errorMessage.includes('does not exist')) {
+        throw new Error('Database migration required. Please run ADD_USER_DEFAULT_PIN.sql migration.');
+      }
+      throw error;
+    }
+  }
+
+  async updateOrdersCollectionPinForUser(userId: string, newPin: string): Promise<void> {
+    // Update collection_pin for all active orders (not PICKED_UP or CANCELLED)
+    // Using the same pool since it's the same database
+    const query = `
+      UPDATE orders
+      SET collection_pin = $1, updated_at = NOW()
+      WHERE user_id = $2 
+        AND status NOT IN ('PICKED_UP', 'CANCELLED')
+    `;
+    await this.pool.query(query, [newPin, userId]);
+  }
 }
 

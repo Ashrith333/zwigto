@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpaci
 import { useNavigation } from '@react-navigation/native';
 import { orderService, restaurantService, reviewService } from '../../services';
 import { Order, OrderStatus, Review, RestaurantRating } from '../../../shared/api-contracts';
+import { getOrderIdDisplay } from '../../utils/orderId';
 
 export const RatingAndOrderHistoryScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -129,7 +130,7 @@ export const RatingAndOrderHistoryScreen: React.FC = () => {
             >
               <View style={styles.orderHeader}>
                 <View style={styles.orderIdContainer}>
-                  <Text style={styles.orderId}>Order #{item.id.slice(0, 8)}</Text>
+                  <Text style={styles.orderId}>Order #{getOrderIdDisplay(item.id)}</Text>
                   {review && (
                     <View style={styles.ratingBadge}>
                       {renderStars(review.rating)}

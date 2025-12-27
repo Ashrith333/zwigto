@@ -17,6 +17,7 @@ import { userService, authService, restaurantService, orderService } from '../..
 import { UserProfile, UserRole, Order, OrderStatus } from '../../../shared/api-contracts';
 import { BottomNavBar } from '../../components/BottomNavBar';
 import { theme } from '../../theme/theme';
+import { getOrderIdDisplay } from '../../utils/orderId';
 
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -132,6 +133,32 @@ export const ProfileScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefreshOtp = async () => {
+    Alert.alert(
+      'Refresh PIN',
+      'Are you sure you want to generate a new PIN? The old PIN will no longer work for active orders.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Refresh',
+          style: 'default',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const response = await userService.regeneratePin();
+              await loadProfile();
+              Alert.alert('Success', `New PIN: ${response.pin}\n\n${response.message}`);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to refresh PIN');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleChangePassword = async () => {
@@ -378,6 +405,27 @@ export const ProfileScreen: React.FC = () => {
             />
           </View>
         </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Order PIN (OTP)</Text>
+          <View style={styles.otpContainer}>
+            <View style={styles.otpDisplay}>
+              <Ionicons name="lock-closed-outline" size={16} color={theme.colors.primary} style={styles.otpIcon} />
+              <Text style={styles.otpText}>{profile.default_pin || 'Not set'}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.refreshOtpButton, loading && styles.buttonDisabled]}
+              onPress={handleRefreshOtp}
+              disabled={loading}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="refresh-outline" size={14} color={theme.colors.primary} />
+              <Text style={styles.refreshOtpText}>Refresh</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.otpDescription}>
+            This PIN is used for order pickup verification. When refreshed, the old PIN will no longer work for active orders.
+          </Text>
+        </View>
         <View style={styles.buttonRow}>
           <TouchableOpacity
             style={[
@@ -543,7 +591,7 @@ export const ProfileScreen: React.FC = () => {
                         onPress={() => (navigation as any).navigate('OrderTracking', { orderId: order.id })}
                       >
                         <View style={styles.orderHeader}>
-                          <Text style={styles.orderId}>Order #{order.id.slice(0, 8)}</Text>
+                          <Text style={styles.orderId}>Order #{getOrderIdDisplay(order.id)}</Text>
                           <View
                             style={[
                               styles.statusBadge,
@@ -554,6 +602,12 @@ export const ProfileScreen: React.FC = () => {
                           </View>
                         </View>
                         <Text style={styles.orderAmount}>₹{order.total_amount}</Text>
+                        {profile?.default_pin && order.status !== OrderStatus.PICKED_UP && order.status !== OrderStatus.CANCELLED && (
+                          <View style={styles.orderPinContainer}>
+                            <Ionicons name="lock-closed-outline" size={12} color={theme.colors.textSecondary} />
+                            <Text style={styles.orderPinText}>PIN: {profile.default_pin}</Text>
+                          </View>
+                        )}
                         <Text style={styles.orderDate}>
                           {new Date(order.created_at).toLocaleDateString()}
                         </Text>
@@ -893,6 +947,55 @@ const styles = StyleSheet.create({
   inputIcon: {
     marginRight: theme.spacing.xs,
   },
+  otpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginBottom: 4,
+  },
+  otpDisplay: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  otpIcon: {
+    marginRight: theme.spacing.xs,
+  },
+  otpText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    letterSpacing: 2,
+  },
+  refreshOtpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    gap: 4,
+  },
+  refreshOtpText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.primary,
+  },
+  otpDescription: {
+    fontSize: 11,
+    fontWeight: '400',
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+    lineHeight: 16,
+  },
   input: {
     flex: 1,
     fontSize: 14,
@@ -1145,6 +1248,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 2,
     color: theme.colors.textPrimary,
+  },
+  orderPinContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  orderPinText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: theme.colors.textSecondary,
+    letterSpacing: 1,
   },
   orderDate: {
     fontSize: 12,

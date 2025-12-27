@@ -31,6 +31,7 @@ export interface OrderItem {
 export interface Order {
   id: string;
   user_id: string;
+  user_name?: string; // User's name for restaurant display
   restaurant_id: string;
   status: OrderStatus;
   total_amount: number;

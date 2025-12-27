@@ -36,5 +36,14 @@ export class UsersController {
     );
     return { message: 'Profile updated successfully' };
   }
+
+  @Put('me/regenerate-pin')
+  async regeneratePin(@Request() req: any): Promise<{ message: string; pin: string }> {
+    const newPin = await this.usersService.regeneratePin(req.user.id);
+    return { 
+      message: 'PIN regenerated successfully. Old PIN is no longer valid for active orders.',
+      pin: newPin 
+    };
+  }
 }
 

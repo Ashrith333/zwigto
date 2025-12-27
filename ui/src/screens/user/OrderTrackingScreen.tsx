@@ -4,6 +4,7 @@ import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/nativ
 import { orderService, userService, reviewService, websocketService } from '../../services';
 import { Order, OrderStatus } from '../../../shared/api-contracts';
 import { theme } from '../../theme/theme';
+import { getOrderIdDisplay } from '../../utils/orderId';
 
 export const OrderTrackingScreen: React.FC = () => {
   const route = useRoute();
@@ -220,7 +221,7 @@ export const OrderTrackingScreen: React.FC = () => {
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
             <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
           </View>
-          <Text style={styles.orderId}>Order #{order.id.substring(0, 8)}</Text>
+          <Text style={styles.orderId}>Order #{getOrderIdDisplay(order.id)}</Text>
         </View>
 
         {order.estimated_ready_time && order.status !== 'PICKED_UP' && order.status !== 'CANCELLED' && (
@@ -255,9 +256,9 @@ export const OrderTrackingScreen: React.FC = () => {
           </Text>
         </View>
 
-        {order.status === 'READY' && userPin && (
+        {userPin && order.status !== OrderStatus.PICKED_UP && order.status !== OrderStatus.CANCELLED && (
           <View style={styles.pinCard}>
-            <Text style={styles.pinLabel}>Your Default PIN</Text>
+            <Text style={styles.pinLabel}>Your Order PIN</Text>
             <Text style={styles.pinValue}>{userPin}</Text>
             <Text style={styles.pinNote}>Show this 4-digit PIN to the restaurant when collecting your order</Text>
             <Text style={styles.pinNoteSmall}>Note: Restaurant will verify your PIN before marking order as picked up</Text>
@@ -316,7 +317,7 @@ export const OrderTrackingScreen: React.FC = () => {
               >
                 <View style={styles.modalContent}>
                   <Text style={styles.modalTitle}>Rate Your Order</Text>
-                  <Text style={styles.modalSubtitle}>Order #{order?.id.slice(0, 8)}</Text>
+                  <Text style={styles.modalSubtitle}>Order #{order ? getOrderIdDisplay(order.id) : 'N/A'}</Text>
                   
                   <View style={styles.ratingSection}>
                     <Text style={styles.ratingLabel}>How was your experience?</Text>

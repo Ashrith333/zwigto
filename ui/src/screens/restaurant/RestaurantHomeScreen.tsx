@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { orderService, restaurantService, authService, menuService } from '../../services';
 import { Order, RestaurantProfile, OrderStatus } from '../../../shared/api-contracts';
 import { theme } from '../../theme/theme';
@@ -11,13 +12,27 @@ export const RestaurantHomeScreen: React.FC = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(null);
-  const [todayOrders, setTodayOrders] = useState<Order[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
     loadDashboard();
   }, []);
+
+  // Refresh dashboard when screen comes into focus (e.g., after updating order status)
+  useFocusEffect(
+    React.useCallback(() => {
+      loadDashboard();
+    }, [])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadDashboard();
+    setRefreshing(false);
+  };
 
   const loadDashboard = async () => {
     try {
@@ -44,18 +59,23 @@ export const RestaurantHomeScreen: React.FC = () => {
         setNeedsSetup(!rest.description);
       }
 
-      // Load today's orders
+      // Load all orders for earnings calculation
       try {
         const orders = await orderService.getRestaurantOrders();
-        const today = new Date().toISOString().split('T')[0];
-        const todayOrdersList = orders.filter((order) =>
-          order.created_at.startsWith(today)
-        );
-        setTodayOrders(todayOrdersList);
+        console.log('Dashboard: Loaded orders:', orders.length);
+        if (orders.length > 0) {
+          console.log('Dashboard: Sample order:', {
+            id: orders[0].id?.substring(0, 8),
+            status: orders[0].status,
+            created_at: orders[0].created_at,
+            total_amount: orders[0].total_amount
+          });
+        }
+        setAllOrders(orders);
       } catch (orderError) {
         // If orders fail to load, still allow dashboard to show
         console.warn('Failed to load orders:', orderError);
-        setTodayOrders([]);
+        setAllOrders([]);
       }
     } catch (error: any) {
       console.error('Dashboard load error:', error);
@@ -242,46 +262,119 @@ export const RestaurantHomeScreen: React.FC = () => {
     );
   }
 
-  const newOrders = todayOrders.filter(o => o.status === OrderStatus.CONFIRMED || o.status === OrderStatus.PENDING);
-  const preparingOrders = todayOrders.filter(o => o.status === OrderStatus.PREPARING);
-  const readyOrders = todayOrders.filter(o => o.status === OrderStatus.READY);
+  // Helper function to check if a date is today
+  const isToday = (dateString: string): boolean => {
+    if (!dateString) return false;
+    const orderDate = new Date(dateString);
+    const today = new Date();
+    return (
+      orderDate.getDate() === today.getDate() &&
+      orderDate.getMonth() === today.getMonth() &&
+      orderDate.getFullYear() === today.getFullYear()
+    );
+  };
+
+  // Helper function to check if a date is in current month
+  const isCurrentMonth = (dateString: string): boolean => {
+    if (!dateString) return false;
+    const orderDate = new Date(dateString);
+    const now = new Date();
+    return (
+      orderDate.getMonth() === now.getMonth() &&
+      orderDate.getFullYear() === now.getFullYear()
+    );
+  };
+
+  // Filter today's orders from allOrders (always use fresh data)
+  const todayOrdersList = allOrders.filter((order) => {
+    if (!order.created_at) return false;
+    const isTodayOrder = isToday(order.created_at);
+    return isTodayOrder;
+  });
+
+  console.log('Dashboard: Total orders:', allOrders.length);
+  console.log('Dashboard: Today orders:', todayOrdersList.length);
+  console.log('Dashboard: Today orders breakdown:', {
+    new: todayOrdersList.filter(o => o.status === OrderStatus.CONFIRMED || o.status === OrderStatus.PENDING).length,
+    preparing: todayOrdersList.filter(o => o.status === OrderStatus.PREPARING).length,
+    ready: todayOrdersList.filter(o => o.status === OrderStatus.READY).length,
+    pickedUp: todayOrdersList.filter(o => o.status === OrderStatus.PICKED_UP).length,
+  });
+
+  // Calculate earnings
+  const calculateDailyEarnings = () => {
+    const todayCompletedOrders = todayOrdersList.filter(
+      (order) => order.status === OrderStatus.PICKED_UP
+    );
+    const total = todayCompletedOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    console.log('Dashboard: Daily earnings:', total, 'from', todayCompletedOrders.length, 'orders');
+    return total;
+  };
+
+  const calculateMonthlyEarnings = () => {
+    const monthlyCompletedOrders = allOrders.filter(
+      (order) => 
+        order.created_at && 
+        isCurrentMonth(order.created_at) &&
+        order.status === OrderStatus.PICKED_UP
+    );
+    const total = monthlyCompletedOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    console.log('Dashboard: Monthly earnings:', total, 'from', monthlyCompletedOrders.length, 'orders');
+    return total;
+  };
+
+  const dailyEarnings = calculateDailyEarnings();
+  const monthlyEarnings = calculateMonthlyEarnings();
+
+  // Calculate order stats from today's orders (using fresh allOrders data)
+  const newOrders = todayOrdersList.filter(o => 
+    o.status === OrderStatus.CONFIRMED || o.status === OrderStatus.PENDING
+  );
+  const preparingOrders = todayOrdersList.filter(o => o.status === OrderStatus.PREPARING);
+  const readyOrders = todayOrdersList.filter(o => o.status === OrderStatus.READY);
 
   return (
     <View style={styles.container}>
       <ScrollView 
         style={styles.scrollContent}
         contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.title}>{restaurant.name}</Text>
-            <Text style={styles.subtitle}>Restaurant Dashboard</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={[
-                styles.statusButton, 
-                restaurant.status === 'ACTIVE' 
-                  ? styles.activeButton 
-                  : restaurant.status === 'REJECTED'
-                  ? styles.rejectedButton
-                  : styles.pausedButton
-              ]}
-              onPress={handleToggleStatus}
-              disabled={restaurant.status === 'PENDING' || restaurant.status === 'REJECTED'}
-            >
-              <Text style={styles.statusButtonText}>
-                {restaurant.status === 'ACTIVE' 
-                  ? 'Open' 
-                  : restaurant.status === 'PAUSED' 
-                  ? 'Paused' 
-                  : restaurant.status === 'REJECTED'
-                  ? 'Rejected'
-                  : 'Pending'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            <View style={styles.headerLeft}>
+              <Text style={styles.title}>{restaurant.name}</Text>
+              <Text style={styles.subtitle}>Restaurant Dashboard</Text>
+            </View>
+            <View style={styles.headerRight}>
+              <View style={styles.statusContainer}>
+                <Text style={styles.statusLabel}>Restaurant Status:</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.statusButton, 
+                    restaurant.status === 'ACTIVE' 
+                      ? styles.activeButton 
+                      : restaurant.status === 'REJECTED'
+                      ? styles.rejectedButton
+                      : styles.pausedButton
+                  ]}
+                  onPress={handleToggleStatus}
+                  disabled={restaurant.status === 'PENDING' || restaurant.status === 'REJECTED'}
+                >
+                  <Text style={styles.statusButtonText}>
+                    {restaurant.status === 'ACTIVE' 
+                      ? 'Open' 
+                      : restaurant.status === 'PAUSED' 
+                      ? 'Paused' 
+                      : restaurant.status === 'REJECTED'
+                      ? 'Rejected'
+                      : 'Pending'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </SafeAreaView>
 
@@ -302,54 +395,111 @@ export const RestaurantHomeScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Earnings Stats */}
+        <View style={styles.earningsSection}>
+          <View style={styles.earningsCard}>
+            <View style={styles.earningsIconContainer}>
+              <Ionicons name="cash-outline" size={24} color="#34C759" />
+            </View>
+            <View style={styles.earningsContent}>
+              <Text style={styles.earningsLabel}>Daily Earnings</Text>
+              <Text style={styles.earningsAmount}>₹{dailyEarnings.toFixed(2)}</Text>
+            </View>
+          </View>
+          <View style={styles.earningsCard}>
+            <View style={styles.earningsIconContainer}>
+              <Ionicons name="wallet-outline" size={24} color="#007AFF" />
+            </View>
+            <View style={styles.earningsContent}>
+              <Text style={styles.earningsLabel}>Monthly Earnings</Text>
+              <Text style={styles.earningsAmount}>₹{monthlyEarnings.toFixed(2)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Order Stats */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
+            <Ionicons name="notifications-outline" size={20} color={theme.colors.primary} />
             <Text style={styles.statNumber}>{newOrders.length}</Text>
             <Text style={styles.statLabel}>New Orders</Text>
           </View>
           <View style={styles.statCard}>
+            <Ionicons name="time-outline" size={20} color="#FF9500" />
             <Text style={styles.statNumber}>{preparingOrders.length}</Text>
             <Text style={styles.statLabel}>Preparing</Text>
           </View>
           <View style={styles.statCard}>
+            <Ionicons name="checkmark-circle-outline" size={20} color="#34C759" />
             <Text style={styles.statNumber}>{readyOrders.length}</Text>
             <Text style={styles.statLabel}>Ready</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{todayOrders.length}</Text>
+            <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
+            <Text style={styles.statNumber}>{todayOrdersList.length}</Text>
             <Text style={styles.statLabel}>Total Today</Text>
           </View>
         </View>
 
         <View style={styles.actionsContainer}>
           <TouchableOpacity style={styles.actionButton} onPress={handleManageOrders}>
-            <Text style={styles.actionButtonText}>📦 Manage Orders</Text>
-            <Text style={styles.actionButtonSubtext}>View and update order status</Text>
+            <View style={styles.actionButtonIcon}>
+              <Ionicons name="cube-outline" size={22} color={theme.colors.primary} />
+            </View>
+            <View style={styles.actionButtonContent}>
+              <Text style={styles.actionButtonText}>Manage Orders</Text>
+              <Text style={styles.actionButtonSubtext}>View and update order status</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} onPress={handleManageMenu}>
-            <Text style={styles.actionButtonText}>🍽️ Manage Menu</Text>
-            <Text style={styles.actionButtonSubtext}>Add, edit, or remove items</Text>
+            <View style={styles.actionButtonIcon}>
+              <Ionicons name="restaurant-outline" size={22} color={theme.colors.primary} />
+            </View>
+            <View style={styles.actionButtonContent}>
+              <Text style={styles.actionButtonText}>Manage Menu</Text>
+              <Text style={styles.actionButtonSubtext}>Add, edit, or remove items</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} onPress={handleEditRestaurant}>
-            <Text style={styles.actionButtonText}>✏️ Edit Restaurant</Text>
-            <Text style={styles.actionButtonSubtext}>Edit all restaurant details including payment info</Text>
+            <View style={styles.actionButtonIcon}>
+              <Ionicons name="create-outline" size={22} color={theme.colors.primary} />
+            </View>
+            <View style={styles.actionButtonContent}>
+              <Text style={styles.actionButtonText}>Edit Restaurant</Text>
+              <Text style={styles.actionButtonSubtext}>Edit all restaurant details including payment info</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} onPress={handleRatingAndOrderHistory}>
-            <Text style={styles.actionButtonText}>⭐ Rating and Order History</Text>
-            <Text style={styles.actionButtonSubtext}>View ratings, reviews, and order history</Text>
+            <View style={styles.actionButtonIcon}>
+              <Ionicons name="star-outline" size={22} color={theme.colors.primary} />
+            </View>
+            <View style={styles.actionButtonContent}>
+              <Text style={styles.actionButtonText}>Rating & History</Text>
+              <Text style={styles.actionButtonSubtext}>View ratings, reviews, and order history</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.actionButton, styles.deleteButton]} 
             onPress={handleDeleteRestaurant}
           >
-            <Text style={[styles.actionButtonText, styles.deleteButtonText]}>🗑️ Delete Restaurant</Text>
-            <Text style={[styles.actionButtonSubtext, styles.deleteButtonSubtext]}>
-              Permanently delete your restaurant and all associated data
-            </Text>
+            <View style={styles.actionButtonIcon}>
+              <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+            </View>
+            <View style={styles.actionButtonContent}>
+              <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete Restaurant</Text>
+              <Text style={[styles.actionButtonSubtext, styles.deleteButtonSubtext]}>
+                Permanently delete your restaurant and all associated data
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#FF3B30" />
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -372,25 +522,38 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.md,
     backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
-    ...theme.shadows.sm,
+    ...theme.shadows.md,
   },
   headerLeft: {
     flex: 1,
   },
   headerRight: {
     alignItems: 'flex-end',
-    gap: 8,
+    marginLeft: theme.spacing.md,
+  },
+  statusContainer: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  statusLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   title: {
-    ...theme.typography.h1,
+    fontSize: 20,
+    fontWeight: '700',
     color: theme.colors.textPrimary,
+    marginBottom: 2,
   },
   logoutButton: {
     paddingHorizontal: 12,
@@ -416,9 +579,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statusButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.sm,
+    minWidth: 70,
+    alignItems: 'center',
   },
   activeButton: {
     backgroundColor: '#34C759',
@@ -426,97 +591,155 @@ const styles = StyleSheet.create({
   pausedButton: {
     backgroundColor: '#FF9500',
   },
+  rejectedButton: {
+    backgroundColor: '#FF3B30',
+  },
   statusButtonText: {
     color: '#fff',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 12,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '400',
+    color: theme.colors.textSecondary,
+    marginTop: 0,
   },
   warningBanner: {
     backgroundColor: '#FFF3E0',
-    padding: 12,
-    margin: 16,
-    borderRadius: 8,
-    borderLeftWidth: 4,
+    padding: theme.spacing.sm,
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    borderLeftWidth: 3,
     borderLeftColor: '#FF9500',
   },
   warningText: {
     color: '#E65100',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   rejectedBanner: {
     backgroundColor: '#F8D7DA',
-    padding: 12,
-    margin: 16,
-    borderRadius: 8,
-    borderLeftWidth: 4,
+    padding: theme.spacing.sm,
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    borderLeftWidth: 3,
     borderLeftColor: '#DC3545',
   },
   rejectedText: {
     color: '#721C24',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   rejectionReason: {
     color: '#721C24',
-    fontSize: 12,
+    fontSize: 11,
     fontStyle: 'italic',
+  },
+  earningsSection: {
+    flexDirection: 'row',
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  earningsCard: {
+    flex: 1,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...theme.shadows.md,
+  },
+  earningsIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: theme.spacing.sm,
+  },
+  earningsContent: {
+    flex: 1,
+  },
+  earningsLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: theme.colors.textSecondary,
+    marginBottom: 4,
+  },
+  earningsAmount: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 16,
-    gap: 12,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+    gap: theme.spacing.sm,
   },
   statCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
     width: '47%',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.sm,
   },
   statNumber: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    marginTop: theme.spacing.xs,
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 11,
+    fontWeight: '500',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   actionsContainer: {
-    padding: 16,
-    gap: 12,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    gap: theme.spacing.sm,
   },
   actionButton: {
     backgroundColor: theme.colors.surface,
-    padding: theme.spacing.lg,
-    borderRadius: theme.borderRadius.lg,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.md,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...theme.shadows.sm,
+  },
+  actionButtonIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: theme.spacing.sm,
+  },
+  actionButtonContent: {
+    flex: 1,
   },
   actionButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: 2,
   },
   actionButtonSubtext: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 12,
+    color: theme.colors.textSecondary,
   },
   deleteButton: {
     backgroundColor: '#fff',

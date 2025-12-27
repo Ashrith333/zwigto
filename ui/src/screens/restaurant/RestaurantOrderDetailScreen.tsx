@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpa
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { orderService, reviewService, restaurantService } from '../../services';
 import { Order, OrderStatus, Review } from '../../../shared/api-contracts';
+import { getOrderIdDisplay } from '../../utils/orderId';
 
 export const RestaurantOrderDetailScreen: React.FC = () => {
   const route = useRoute();
@@ -203,7 +204,7 @@ export const RestaurantOrderDetailScreen: React.FC = () => {
           <Text style={styles.sectionTitle}>Order Information</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Order ID:</Text>
-            <Text style={styles.infoValue}>#{order.id.slice(0, 8)}</Text>
+            <Text style={styles.infoValue}>#{getOrderIdDisplay(order.id)}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Status:</Text>

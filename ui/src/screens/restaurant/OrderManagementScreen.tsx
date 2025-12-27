@@ -5,6 +5,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { orderService, restaurantService, websocketService } from '../../services';
 import { Order, OrderStatus } from '../../../shared/api-contracts';
 import { theme } from '../../theme/theme';
+import { getOrderIdDisplay } from '../../utils/orderId';
 
 export const OrderManagementScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -227,23 +228,30 @@ export const OrderManagementScreen: React.FC = () => {
       </SafeAreaView>
       <FlatList
         data={orders}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => item.id || `order-${index}`}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         renderItem={({ item }) => {
           const nextStatus = getNextStatus(item.status);
+          const orderIdDisplay = getOrderIdDisplay(item.id);
+          
           return (
             <View style={styles.orderCard}>
               <View style={styles.orderHeader}>
-                <Text style={styles.orderId}>Order #{item.id.slice(0, 8)}</Text>
+                <View style={styles.orderHeaderLeft}>
+                  <Text style={styles.orderId}>Order #{orderIdDisplay}</Text>
+                  {item.user_name && (
+                    <Text style={styles.userName}>{item.user_name}</Text>
+                  )}
+                </View>
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
                   <Text style={styles.statusText}>{item.status}</Text>
                 </View>
               </View>
-              <Text style={styles.orderAmount}>₹{item.total_amount.toFixed(2)}</Text>
+              <Text style={styles.orderAmount}>₹{(item.total_amount || 0).toFixed(2)}</Text>
               <Text style={styles.orderDate}>
-                {new Date(item.created_at).toLocaleString()}
+                {item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}
               </Text>
               <Text style={styles.paymentStatus}>
                 Payment: {item.payment_method === 'CASH_ON_PICKUP' ? '💵 Cash on Pickup' : '💳 Online'}
@@ -251,8 +259,8 @@ export const OrderManagementScreen: React.FC = () => {
               {item.items && item.items.length > 0 && (
                 <View style={styles.itemsContainer}>
                   <Text style={styles.itemsTitle}>Items:</Text>
-                  {item.items.map((orderItem) => (
-                    <Text key={orderItem.id} style={styles.itemText}>
+                  {item.items.map((orderItem, index) => (
+                    <Text key={orderItem.id || `item-${index}-${orderItem.menu_item_id}`} style={styles.itemText}>
                       • {orderItem.menu_item_name || 'Item'} x {orderItem.quantity}
                     </Text>
                   ))}
@@ -391,9 +399,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  orderHeaderLeft: {
+    flex: 1,
+  },
   orderId: {
     ...theme.typography.bodyBold,
     color: theme.colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  userName: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
   },
   statusBadge: {
     paddingHorizontal: theme.spacing.md,

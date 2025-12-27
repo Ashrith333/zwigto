@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIn
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { orderService } from '../../services';
 import { CreateOrderRequest, MenuItem, RestaurantProfile } from '../../../shared/api-contracts';
+import { getOrderIdDisplay } from '../../utils/orderId';
 
 export const CheckoutScreen: React.FC = () => {
   const route = useRoute();
@@ -61,7 +62,7 @@ export const CheckoutScreen: React.FC = () => {
       setTimeout(() => {
         Alert.alert(
           'Order Placed!',
-          `Your order #${order.id.substring(0, 8)} has been placed. Pay ₹${totalAmount.toFixed(2)} on pickup.`
+          `Your order #${getOrderIdDisplay(order.id)} has been placed. Pay ₹${totalAmount.toFixed(2)} on pickup.`
         );
       }, 500);
     } catch (error: any) {

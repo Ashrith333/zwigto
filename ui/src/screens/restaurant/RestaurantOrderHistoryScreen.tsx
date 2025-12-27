@@ -58,7 +58,7 @@ export const RestaurantOrderHistoryScreen: React.FC = () => {
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.orderCard}>
             <View style={styles.orderHeader}>
-              <Text style={styles.orderId}>Order #{item.id.slice(0, 8)}</Text>
+              <Text style={styles.orderId}>Order #{getOrderIdDisplay(item.id)}</Text>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
                 <Text style={styles.statusText}>{item.status}</Text>
               </View>

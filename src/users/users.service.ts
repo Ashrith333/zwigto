@@ -1,11 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { DatabaseProvider } from './providers/database.provider';
 import { UserProfileDto } from './dto/user-profile.dto';
 import { User } from './interfaces/user.interface';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly databaseProvider: DatabaseProvider) {}
+  constructor(
+    private readonly databaseProvider: DatabaseProvider,
+  ) {}
 
   async getProfile(userId: string): Promise<UserProfileDto> {
     try {
@@ -41,6 +43,18 @@ export class UsersService {
 
   async updateProfile(userId: string, name?: string, defaultAddresses?: any[]): Promise<void> {
     await this.databaseProvider.updateUserProfile(userId, name, defaultAddresses);
+  }
+
+  async regeneratePin(userId: string): Promise<string> {
+    // Regenerate the user's PIN
+    const newPin = await this.databaseProvider.regenerateUserPin(userId);
+    
+    // Update all active orders with the new PIN (using direct database access to avoid circular dependency)
+    // We'll need to import OrdersDatabaseProvider or access it through a shared service
+    // For now, we'll update orders directly in the users database provider
+    await this.databaseProvider.updateOrdersCollectionPinForUser(userId, newPin);
+    
+    return newPin;
   }
 }
 

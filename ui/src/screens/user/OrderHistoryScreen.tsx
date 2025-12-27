@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } fr
 import { useNavigation } from '@react-navigation/native';
 import { orderService } from '../../services';
 import { Order, OrderStatus } from '../../../shared/api-contracts';
+import { getOrderIdDisplay } from '../../utils/orderId';
 
 export const OrderHistoryScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -64,7 +65,7 @@ export const OrderHistoryScreen: React.FC = () => {
               }}
             >
               <View style={styles.orderHeader}>
-                <Text style={styles.orderId}>Order #{item.id.slice(0, 8)}</Text>
+                <Text style={styles.orderId}>Order #{getOrderIdDisplay(item.id)}</Text>
                 <View
                   style={[
                     styles.statusBadge,

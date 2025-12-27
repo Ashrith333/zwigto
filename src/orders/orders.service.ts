@@ -191,6 +191,10 @@ export class OrdersService {
     return orderDto;
   }
 
+  async updateOrdersCollectionPinForUser(userId: string, newPin: string): Promise<void> {
+    await this.databaseProvider.updateOrdersCollectionPinForUser(userId, newPin);
+  }
+
   async completePickup(orderId: string, userId: string, collectionPin?: string): Promise<OrderDto> {
     const order = await this.databaseProvider.findOrderById(orderId);
 
@@ -239,18 +243,21 @@ export class OrdersService {
     const paymentId = order.payment_id || 'CASH_ON_PICKUP';
     const paymentMethod = order.payment_id ? 'ONLINE' : 'CASH_ON_PICKUP';
     
-    // Get customer's default PIN to show in order (only for customer viewing their own orders)
+    // Get customer's default PIN and name to show in order
     let customerDefaultPin: string | null = null;
+    let customerName: string | null = null;
     try {
       const customer = await this.usersService.getUserById(order.user_id);
       customerDefaultPin = customer?.default_pin || null;
+      customerName = customer?.name || null;
     } catch (error) {
-      console.warn('Failed to fetch customer PIN for order:', error);
+      console.warn('Failed to fetch customer info for order:', error);
     }
     
     const dto: OrderDto = {
       id: order.id,
       user_id: order.user_id,
+      user_name: customerName || undefined, // Include user name for restaurant display
       restaurant_id: order.restaurant_id,
       status: order.status,
       total_amount: order.total_amount,

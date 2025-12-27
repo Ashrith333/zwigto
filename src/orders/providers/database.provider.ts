@@ -294,6 +294,17 @@ export class DatabaseProvider implements OnModuleInit, OnModuleDestroy {
     } as Order;
   }
 
+  async updateOrdersCollectionPinForUser(userId: string, newPin: string): Promise<void> {
+    // Update collection_pin for all active orders (not PICKED_UP or CANCELLED)
+    const query = `
+      UPDATE orders
+      SET collection_pin = $1, updated_at = NOW()
+      WHERE user_id = $2 
+        AND status NOT IN ('PICKED_UP', 'CANCELLED')
+    `;
+    await this.pool.query(query, [newPin, userId]);
+  }
+
   async findOrderItemsByOrderId(orderId: string): Promise<any[]> {
     const query = `
       SELECT oi.id, oi.order_id, oi.menu_item_id, oi.quantity, oi.price, oi.created_at,
