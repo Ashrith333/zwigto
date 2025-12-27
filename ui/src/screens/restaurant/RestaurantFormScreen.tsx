@@ -198,16 +198,13 @@ export const RestaurantFormScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>
-          {restaurant ? 'Edit Restaurant' : 'Create Restaurant'}
-        </Text>
-        {restaurant && restaurant.status === 'PENDING' && (
+      {restaurant && restaurant.status === 'PENDING' && (
+        <View style={styles.pendingBanner}>
           <Text style={styles.pendingText}>Pending admin approval</Text>
-        )}
-      </View>
+        </View>
+      )}
 
-      <View style={styles.section}>
+      <View style={[styles.section, styles.sectionFirst]}>
         <Text style={styles.label}>Restaurant Name *</Text>
         <TextInput
           style={styles.input}
@@ -346,29 +343,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    backgroundColor: '#fff',
-    padding: 20,
+  pendingBanner: {
+    backgroundColor: '#FFF3E0',
+    padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+    borderBottomColor: '#FF9500',
   },
   pendingText: {
     fontSize: 14,
     color: '#FF9500',
-    marginTop: 8,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   section: {
     backgroundColor: '#fff',
     padding: 20,
-    marginTop: 16,
+    marginTop: 0,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  sectionFirst: {
+    marginTop: 0,
   },
   label: {
     fontSize: 16,

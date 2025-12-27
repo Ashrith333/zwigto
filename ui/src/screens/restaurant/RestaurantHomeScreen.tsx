@@ -398,46 +398,54 @@ export const RestaurantHomeScreen: React.FC = () => {
         {/* Earnings Stats */}
         <View style={styles.earningsSection}>
           <View style={styles.earningsCard}>
-            <View style={styles.earningsIconContainer}>
-              <Ionicons name="cash-outline" size={24} color="#34C759" />
+            <View style={styles.earningsHeader}>
+              <Ionicons name="cash-outline" size={16} color="#34C759" />
+              <Text style={styles.earningsLabel}>Daily</Text>
             </View>
-            <View style={styles.earningsContent}>
-              <Text style={styles.earningsLabel}>Daily Earnings</Text>
-              <Text style={styles.earningsAmount}>₹{dailyEarnings.toFixed(2)}</Text>
-            </View>
+            <Text style={styles.earningsAmount}>
+              ₹{dailyEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
           </View>
           <View style={styles.earningsCard}>
-            <View style={styles.earningsIconContainer}>
-              <Ionicons name="wallet-outline" size={24} color="#007AFF" />
+            <View style={styles.earningsHeader}>
+              <Ionicons name="wallet-outline" size={16} color="#007AFF" />
+              <Text style={styles.earningsLabel}>Monthly</Text>
             </View>
-            <View style={styles.earningsContent}>
-              <Text style={styles.earningsLabel}>Monthly Earnings</Text>
-              <Text style={styles.earningsAmount}>₹{monthlyEarnings.toFixed(2)}</Text>
-            </View>
+            <Text style={styles.earningsAmount}>
+              ₹{monthlyEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
           </View>
         </View>
 
         {/* Order Stats */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Ionicons name="notifications-outline" size={20} color={theme.colors.primary} />
+            <View style={styles.statHeader}>
+              <Ionicons name="notifications-outline" size={16} color={theme.colors.primary} />
+              <Text style={styles.statLabel}>New</Text>
+            </View>
             <Text style={styles.statNumber}>{newOrders.length}</Text>
-            <Text style={styles.statLabel}>New Orders</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="time-outline" size={20} color="#FF9500" />
+            <View style={styles.statHeader}>
+              <Ionicons name="time-outline" size={16} color="#FF9500" />
+              <Text style={styles.statLabel}>Preparing</Text>
+            </View>
             <Text style={styles.statNumber}>{preparingOrders.length}</Text>
-            <Text style={styles.statLabel}>Preparing</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="#34C759" />
+            <View style={styles.statHeader}>
+              <Ionicons name="checkmark-circle-outline" size={16} color="#34C759" />
+              <Text style={styles.statLabel}>Ready</Text>
+            </View>
             <Text style={styles.statNumber}>{readyOrders.length}</Text>
-            <Text style={styles.statLabel}>Ready</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
+            <View style={styles.statHeader}>
+              <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
+              <Text style={styles.statLabel}>Today</Text>
+            </View>
             <Text style={styles.statNumber}>{todayOrdersList.length}</Text>
-            <Text style={styles.statLabel}>Total Today</Text>
           </View>
         </View>
 
@@ -650,60 +658,56 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
     ...theme.shadows.md,
   },
-  earningsIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
+  earningsHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: theme.spacing.sm,
-  },
-  earningsContent: {
-    flex: 1,
+    gap: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
   },
   earningsLabel: {
     fontSize: 12,
     fontWeight: '500',
     color: theme.colors.textSecondary,
-    marginBottom: 4,
   },
   earningsAmount: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: theme.colors.textPrimary,
+    marginTop: 2,
   },
   statsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.sm,
-    gap: theme.spacing.sm,
+    gap: theme.spacing.xs,
   },
   statCard: {
     backgroundColor: theme.colors.surface,
-    padding: theme.spacing.md,
+    padding: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
-    width: '47%',
-    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
     ...theme.shadows.sm,
   },
+  statHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginBottom: 2,
+  },
   statNumber: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: '700',
-    color: theme.colors.primary,
-    marginTop: theme.spacing.xs,
-    marginBottom: 4,
+    color: theme.colors.textPrimary,
+    marginTop: 2,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
     color: theme.colors.textSecondary,
-    textAlign: 'center',
   },
   actionsContainer: {
     paddingHorizontal: theme.spacing.md,

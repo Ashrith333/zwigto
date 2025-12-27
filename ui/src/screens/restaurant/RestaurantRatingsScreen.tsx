@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { reviewService, restaurantService, orderService } from '../../services';
 import { Review, RestaurantRating, Order } from '../../../shared/api-contracts';
+import { theme } from '../../theme/theme';
+import { getOrderIdDisplay } from '../../utils/orderId';
 
 export const RestaurantRatingsScreen: React.FC = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -14,6 +17,8 @@ export const RestaurantRatingsScreen: React.FC = () => {
   const [replyText, setReplyText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [orderDetails, setOrderDetails] = useState<Record<string, Order>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredReviews, setFilteredReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     loadData();
@@ -31,6 +36,7 @@ export const RestaurantRatingsScreen: React.FC = () => {
       
       setReviews(reviewsData);
       setRating(ratingData);
+      setFilteredReviews(reviewsData);
       
       // Load order details for each review
       const orderDetailsMap: Record<string, Order> = {};
@@ -60,12 +66,31 @@ export const RestaurantRatingsScreen: React.FC = () => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
       stars.push(
-        <Text key={i} style={styles.star}>
-          {i <= ratingValue ? '⭐' : '☆'}
-        </Text>
+        <Ionicons
+          key={i}
+          name={i <= ratingValue ? 'star' : 'star-outline'}
+          size={16}
+          color={i <= ratingValue ? '#FFB800' : theme.colors.border}
+          style={styles.starIcon}
+        />
       );
     }
-    return stars;
+    return <View style={styles.starsRow}>{stars}</View>;
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    if (!text.trim()) {
+      setFilteredReviews(reviews);
+      return;
+    }
+    
+    const lowerQuery = text.toLowerCase().trim();
+    const filtered = reviews.filter(review => {
+      const orderId = getOrderIdDisplay(review.order_id).toLowerCase();
+      return orderId.includes(lowerQuery);
+    });
+    setFilteredReviews(filtered);
   };
 
   const handleReply = (review: Review) => {
@@ -99,16 +124,36 @@ export const RestaurantRatingsScreen: React.FC = () => {
         <View style={styles.ratingHeader}>
           <View style={styles.ratingCard}>
             <Text style={styles.ratingNumber}>{rating.average_rating.toFixed(1)}</Text>
-            <View style={styles.starsRow}>
-              {renderStars(Math.round(rating.average_rating))}
-            </View>
+            {renderStars(Math.round(rating.average_rating))}
             <Text style={styles.totalReviews}>{rating.total_reviews} review{rating.total_reviews !== 1 ? 's' : ''}</Text>
           </View>
         </View>
       )}
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Ionicons name="search-outline" size={20} color={theme.colors.textSecondary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by Order ID"
+            placeholderTextColor={theme.colors.textTertiary}
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearchChange('')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       <FlatList
-        data={reviews}
+        data={filteredReviews}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
           const order = orderDetails[item.order_id];
@@ -125,18 +170,35 @@ export const RestaurantRatingsScreen: React.FC = () => {
               
               {/* Order Details */}
               <View style={styles.orderInfo}>
-                <Text style={styles.orderInfoLabel}>Order Details:</Text>
-                <Text style={styles.orderInfoText}>Order ID: #{item.order_id.slice(0, 8)}</Text>
+                <View style={styles.orderInfoHeader}>
+                  <Ionicons name="receipt-outline" size={16} color={theme.colors.primary} />
+                  <Text style={styles.orderInfoLabel}>Order Details</Text>
+                </View>
+                <View style={styles.orderInfoRow}>
+                  <Text style={styles.orderInfoText}>Order ID: #{getOrderIdDisplay(item.order_id)}</Text>
                 {order && (
                   <>
-                    <Text style={styles.orderInfoText}>Amount: ₹{order.total_amount.toFixed(2)}</Text>
-                    <Text style={styles.orderInfoText}>
-                      Date: {new Date(order.created_at).toLocaleDateString()}
-                    </Text>
-                    {order.items && order.items.length > 0 && (
+                    <View style={styles.orderInfoRow}>
+                      <Ionicons name="cash-outline" size={14} color={theme.colors.textSecondary} />
+                      <Text style={styles.orderInfoText}>₹{order.total_amount.toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.orderInfoRow}>
+                      <Ionicons name="calendar-outline" size={14} color={theme.colors.textSecondary} />
                       <Text style={styles.orderInfoText}>
-                        Items: {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                        {new Date(order.created_at).toLocaleDateString('en-IN', { 
+                          day: 'numeric', 
+                          month: 'short', 
+                          year: 'numeric' 
+                        })}
                       </Text>
+                    </View>
+                    {order.items && order.items.length > 0 && (
+                      <View style={styles.orderInfoRow}>
+                        <Ionicons name="list-outline" size={14} color={theme.colors.textSecondary} />
+                        <Text style={styles.orderInfoText}>
+                          {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                        </Text>
+                      </View>
                     )}
                   </>
                 )}
@@ -266,148 +328,199 @@ export const RestaurantRatingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   ratingHeader: {
-    backgroundColor: '#fff',
-    padding: 20,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.borderLight,
+    ...theme.shadows.md,
   },
   ratingCard: {
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
+    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.success + '15',
+    borderRadius: theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.success + '30',
   },
   ratingNumber: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginBottom: 8,
+    ...theme.typography.h1,
+    fontSize: 56,
+    fontWeight: '700',
+    color: theme.colors.success,
+    marginBottom: theme.spacing.sm,
   },
   starsRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: theme.spacing.sm,
+    gap: 4,
   },
-  star: {
-    fontSize: 20,
+  starIcon: {
     marginHorizontal: 2,
   },
   totalReviews: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
     fontSize: 14,
-    color: '#666',
+  },
+  searchContainer: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderLight,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    gap: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    minHeight: 44,
+  },
+  searchInput: {
+    flex: 1,
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   reviewCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.md,
+    marginHorizontal: theme.spacing.md,
+    marginVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    ...theme.shadows.md,
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing.sm,
   },
   reviewDate: {
+    ...theme.typography.small,
+    color: theme.colors.textSecondary,
     fontSize: 12,
-    color: '#999',
   },
   reviewComment: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 8,
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.sm,
     lineHeight: 20,
   },
   reviewOrderId: {
+    ...theme.typography.small,
+    color: theme.colors.textSecondary,
     fontSize: 12,
-    color: '#999',
   },
   emptyContainer: {
-    padding: 40,
+    padding: theme.spacing.xl,
     alignItems: 'center',
   },
   emptyText: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
     fontSize: 16,
-    color: '#999',
   },
   orderInfo: {
-    marginTop: 12,
-    padding: 10,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    marginBottom: 10,
+    marginTop: theme.spacing.sm,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
+  },
+  orderInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    marginBottom: theme.spacing.sm,
   },
   orderInfoLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
+    ...theme.typography.captionBold,
+    color: theme.colors.textPrimary,
+    fontSize: 13,
+  },
+  orderInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
   },
   orderInfoText: {
+    ...theme.typography.small,
+    color: theme.colors.textSecondary,
     fontSize: 12,
-    color: '#666',
-    marginBottom: 3,
   },
   feedbackSection: {
-    marginTop: 10,
-    marginBottom: 10,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   feedbackLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
+    ...theme.typography.captionBold,
+    color: theme.colors.textPrimary,
+    fontSize: 13,
+    marginBottom: theme.spacing.xs,
   },
   replySection: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 8,
+    marginTop: theme.spacing.sm,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.success + '15',
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.success + '30',
   },
   replyLabel: {
+    ...theme.typography.captionBold,
+    color: theme.colors.success,
     fontSize: 12,
-    fontWeight: '600',
-    color: '#2E7D32',
-    marginBottom: 5,
+    marginBottom: theme.spacing.xs,
   },
   replyText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 8,
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.sm,
+    fontSize: 13,
   },
   replyButton: {
-    backgroundColor: '#2196F3',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: theme.spacing.sm,
+    ...theme.shadows.sm,
   },
   replyButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
+    ...theme.typography.captionBold,
     fontSize: 14,
-    fontWeight: '600',
   },
   editReplyButton: {
-    backgroundColor: '#FF9800',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
+    backgroundColor: theme.colors.warning,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
     alignItems: 'center',
     alignSelf: 'flex-start',
+    ...theme.shadows.sm,
   },
   editReplyButtonText: {
-    color: '#fff',
+    color: theme.colors.textInverse,
+    ...theme.typography.captionBold,
     fontSize: 12,
-    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -419,78 +532,85 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: theme.spacing.lg,
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
     width: '90%',
     maxWidth: 400,
     maxHeight: '90%',
+    ...theme.shadows.lg,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
+    ...theme.typography.h2,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.md,
   },
   modalReviewInfo: {
-    marginBottom: 15,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.md,
   },
   modalReviewText: {
-    fontSize: 14,
-    marginBottom: 5,
+    ...theme.typography.body,
+    marginBottom: theme.spacing.xs,
   },
   modalReviewComment: {
-    fontSize: 14,
-    color: '#666',
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
     fontStyle: 'italic',
-    marginTop: 5,
+    marginTop: theme.spacing.xs,
   },
   replyInputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
+    ...theme.typography.captionBold,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.sm,
+    fontSize: 14,
   },
   replyInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
     minHeight: 100,
     textAlignVertical: 'top',
-    marginBottom: 15,
+    marginBottom: theme.spacing.md,
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    backgroundColor: theme.colors.background,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: theme.spacing.sm,
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
     alignItems: 'center',
-    marginHorizontal: 5,
+    ...theme.shadows.sm,
   },
   cancelButton: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: theme.colors.border,
   },
   cancelButtonText: {
-    color: '#666',
-    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    ...theme.typography.captionBold,
   },
   submitButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: theme.colors.primary,
   },
   submitButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.colors.border,
+    opacity: 0.5,
   },
   submitButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: theme.colors.textInverse,
+    ...theme.typography.captionBold,
   },
 });
 
