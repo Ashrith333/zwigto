@@ -101,15 +101,21 @@ export class OrdersService {
     }
   }
 
-  async getOrder(orderId: string, userId?: string): Promise<OrderDto> {
+  async getOrder(orderId: string, userId?: string, restaurantId?: string): Promise<OrderDto> {
     const order = await this.databaseProvider.findOrderById(orderId);
 
     if (!order) {
       throw new NotFoundException('Order not found');
     }
 
-    if (userId && order.user_id !== userId) {
-      throw new ForbiddenException('You can only access your own orders');
+    // Allow access if:
+    // 1. User is the order owner (userId matches), OR
+    // 2. User owns the restaurant that the order belongs to (restaurantId matches)
+    const isOrderOwner = userId && order.user_id === userId;
+    const isRestaurantOwner = restaurantId && order.restaurant_id === restaurantId;
+
+    if (!isOrderOwner && !isRestaurantOwner) {
+      throw new ForbiddenException('You can only access your own orders or orders from your restaurant');
     }
 
     return this.mapToDto(order, true);

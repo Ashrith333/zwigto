@@ -78,8 +78,22 @@ export class OrdersController {
 
   @Get(':id')
   async getOrder(@Param('id') id: string, @Request() req: any): Promise<OrderDto> {
-    const userId = req.user.role === UserRole.USER ? req.user.id : undefined;
-    return this.ordersService.getOrder(id, userId);
+    // Always pass userId so users can view their own orders regardless of role
+    // (e.g., restaurant owners can view orders they placed as customers)
+    const userId = req.user.id;
+    
+    // Check if user owns a restaurant (for restaurant owners to view orders placed at their restaurant)
+    let restaurantId: string | undefined;
+    try {
+      const restaurantUser = await this.restaurantsService.getRestaurantForUser(req.user.id);
+      if (restaurantUser) {
+        restaurantId = restaurantUser.restaurant_id;
+      }
+    } catch (error) {
+      // Ignore errors, restaurantId stays undefined
+    }
+    
+    return this.ordersService.getOrder(id, userId, restaurantId);
   }
 
   @Patch(':id/status')

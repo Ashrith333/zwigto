@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { userService } from '../services';
+import { UserRole } from '../../shared/api-contracts';
 
 interface BottomNavBarProps {
   currentScreen: 'Home' | 'Profile';
@@ -11,17 +13,44 @@ interface BottomNavBarProps {
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({ 
   currentScreen, 
-  homeRoute = 'UserHome' 
+  homeRoute 
 }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const [defaultHomeRoute, setDefaultHomeRoute] = useState<'UserHome' | 'RestaurantHome' | 'AdminHome'>('UserHome');
+
+  useEffect(() => {
+    loadDefaultRoute();
+  }, []);
+
+  const loadDefaultRoute = async () => {
+    try {
+      const profile = await userService.getProfile();
+      if (profile?.default_role) {
+        if (profile.default_role === UserRole.RESTAURANT) {
+          setDefaultHomeRoute('RestaurantHome');
+        } else if (profile.default_role === UserRole.ADMIN) {
+          setDefaultHomeRoute('AdminHome');
+        } else {
+          setDefaultHomeRoute('UserHome');
+        }
+      }
+    } catch (error) {
+      // Ignore errors, use default
+    }
+  };
+
+  const getHomeRoute = () => {
+    // Use default_role if homeRoute is not explicitly provided
+    return homeRoute || defaultHomeRoute;
+  };
 
   return (
     <View style={styles.wrapper}>
       <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 4) }]}>
         <TouchableOpacity
           style={[styles.navItem, styles.navItemHome, currentScreen === 'Home' && styles.navItemActive]}
-          onPress={() => (navigation as any).navigate(homeRoute)}
+          onPress={() => (navigation as any).navigate(getHomeRoute())}
           activeOpacity={0.7}
         >
           <View style={[styles.iconContainer, currentScreen === 'Home' && styles.iconContainerActive]}>

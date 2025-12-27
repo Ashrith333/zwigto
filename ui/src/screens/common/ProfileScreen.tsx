@@ -9,7 +9,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,11 +31,10 @@ export const ProfileScreen: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNavDropdown, setShowNavDropdown] = useState(false);
-  const [showDefaultDropdown, setShowDefaultDropdown] = useState(false);
   const [navDropdownLayout, setNavDropdownLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [defaultDropdownLayout, setDefaultDropdownLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [setAsDefault, setSetAsDefault] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const navDropdownRef = useRef<View>(null);
-  const defaultDropdownRef = useRef<View>(null);
   const [hasRestaurant, setHasRestaurant] = useState(false);
   const [hadRestaurant, setHadRestaurant] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -52,8 +51,27 @@ export const ProfileScreen: React.FC = () => {
     // Load orders for all roles
     if (profile) {
       loadOrders();
+      // Initialize checkbox state based on default role
+      const roleToCheck = getCurrentSectionRole() || profile.default_role;
+      if (roleToCheck) {
+        const isCurrentlyDefault = profile.default_role === roleToCheck;
+        setSetAsDefault(isCurrentlyDefault);
+      }
     }
   }, [profile]);
+
+  // Update checkbox state when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (profile) {
+        const roleToCheck = selectedRole || getCurrentSectionRole() || profile.default_role;
+        if (roleToCheck) {
+          const isCurrentlyDefault = profile.default_role === roleToCheck;
+          setSetAsDefault(isCurrentlyDefault);
+        }
+      }
+    }, [profile, selectedRole])
+  );
 
   const loadProfile = async () => {
     try {
@@ -198,29 +216,57 @@ export const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handleSetDefaultView = async (role: UserRole) => {
-    setLoading(true);
-    try {
-      await userService.setDefaultRole(role);
-      // Reload profile to get updated default_role
-      await loadProfile();
-      Alert.alert('Success', 'Default view updated successfully. You will be taken to this section when you login next time.');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update default view');
-      console.error('Failed to update default role:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleSelectRole = (role: UserRole) => {
+    setSelectedRole(role);
+    setShowNavDropdown(false);
+    // Update checkbox state based on selected role
+    const isSelectedDefault = profile?.default_role === role;
+    setSetAsDefault(isSelectedDefault);
   };
 
-  const handleNavigateToSection = (role: UserRole) => {
-    setShowNavDropdown(false);
-    if (role === UserRole.USER) {
+  const handleNavigateToSection = async () => {
+    if (!selectedRole) return;
+    
+    // Navigate to the selected section
+    if (selectedRole === UserRole.USER) {
       (navigation as any).navigate('UserHome');
-    } else if (role === UserRole.RESTAURANT) {
+    } else if (selectedRole === UserRole.RESTAURANT) {
       (navigation as any).navigate('RestaurantHome');
-    } else if (role === UserRole.ADMIN) {
+    } else if (selectedRole === UserRole.ADMIN) {
       (navigation as any).navigate('AdminHome');
+    }
+    
+    // Reset selected role after navigation
+    setTimeout(() => {
+      setSelectedRole(null);
+    }, 100);
+  };
+
+  const handleToggleDefault = async () => {
+    const roleToSet = selectedRole || getCurrentSectionRole() || profile?.default_role;
+    if (!roleToSet) return;
+    
+    const isCurrentlyDefault = profile?.default_role === roleToSet;
+    const newDefaultState = !isCurrentlyDefault;
+    
+    // Save when checkbox is toggled
+    if (newDefaultState) {
+      setLoading(true);
+      try {
+        await userService.setDefaultRole(roleToSet);
+        // Reload profile to get updated default_role
+        await loadProfile();
+        setSetAsDefault(true);
+        Alert.alert('Success', 'Default view updated successfully. You will be taken to this section when you login next time.');
+      } catch (error: any) {
+        Alert.alert('Error', error.message || 'Failed to update default view');
+        console.error('Failed to update default role:', error);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // If unchecking, keep previous default (don't clear)
+      setSetAsDefault(false);
     }
   };
 
@@ -244,14 +290,8 @@ export const ProfileScreen: React.FC = () => {
     }
   };
 
-  const getCurrentDefaultLabel = (): string => {
-    if (!profile?.default_role) {
-      return 'Select default view...';
-    }
-    return getDefaultRoleLabel(profile.default_role);
-  };
 
-  const getCurrentSectionLabel = (): string => {
+  const getCurrentSectionRole = (): UserRole | null => {
     // Get the current route name from navigation state
     const state = (navigation as any).getState?.();
     const currentRoute = state?.routes?.[state?.index];
@@ -259,11 +299,25 @@ export const ProfileScreen: React.FC = () => {
     
     // Determine which section we're currently in based on route name
     if (currentRouteName === 'UserHome') {
-      return getRoleLabel(UserRole.USER);
+      return UserRole.USER;
     } else if (currentRouteName === 'RestaurantHome') {
-      return getRoleLabel(UserRole.RESTAURANT);
+      return UserRole.RESTAURANT;
     } else if (currentRouteName === 'AdminHome') {
-      return getRoleLabel(UserRole.ADMIN);
+      return UserRole.ADMIN;
+    }
+    
+    return null;
+  };
+
+  const getCurrentSectionLabel = (): string => {
+    const currentRole = getCurrentSectionRole();
+    if (currentRole) {
+      return getRoleLabel(currentRole);
+    }
+    
+    // If no current section detected, show default role if available
+    if (profile?.default_role) {
+      return getRoleLabel(profile.default_role);
     }
     
     // Default to showing based on profile role if route doesn't match
@@ -346,9 +400,8 @@ export const ProfileScreen: React.FC = () => {
         style={styles.scrollContent}
         contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }}
         onScrollBeginDrag={() => {
-          // Close dropdowns when scrolling
+          // Close dropdown when scrolling
           setShowNavDropdown(false);
-          setShowDefaultDropdown(false);
         }}
         showsVerticalScrollIndicator={false}
       >
@@ -571,61 +624,45 @@ export const ProfileScreen: React.FC = () => {
             }}
             disabled={loading}
           >
-            <Text style={styles.dropdownButtonText}>{getCurrentSectionLabel()}</Text>
+            <Text style={styles.dropdownButtonText}>
+              {selectedRole ? getRoleLabel(selectedRole) : getCurrentSectionLabel()}
+            </Text>
             <Text style={styles.dropdownArrow}>{showNavDropdown ? '▲' : '▼'}</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <Ionicons name="home-outline" size={18} color={theme.colors.primary} />
-          <Text style={styles.sectionTitle}>Set Default View</Text>
-        </View>
-        <Text style={styles.sectionDescription}>
-          Choose your default landing page for future logins
-        </Text>
-        <View 
-          style={styles.dropdownContainer}
-          ref={defaultDropdownRef}
-          collapsable={false}
-          onLayout={() => {
-            if (defaultDropdownRef.current) {
-              defaultDropdownRef.current.measure((x, y, width, height, pageX, pageY) => {
-                setDefaultDropdownLayout({ x: pageX, y: pageY, width, height });
-              });
-            }
-          }}
-        >
-          <TouchableOpacity
-            style={[
-              styles.dropdownButton,
-              profile.default_role && styles.dropdownButtonActive,
-              loading && styles.buttonDisabled,
-            ]}
-            onPress={() => {
-              if (defaultDropdownRef.current) {
-                defaultDropdownRef.current.measure((x, y, width, height, pageX, pageY) => {
-                  setDefaultDropdownLayout({ x: pageX, y: pageY, width, height });
-                });
-              }
-              setShowDefaultDropdown(!showDefaultDropdown);
-            }}
-            disabled={loading}
-          >
-            <Text
-              style={[
-                styles.dropdownButtonText,
-                profile.default_role && styles.dropdownButtonTextActive,
-              ]}
+        {(selectedRole || getCurrentSectionRole() || profile?.default_role) && (
+          <View style={styles.checkboxContainer}>
+            <TouchableOpacity
+              style={styles.checkbox}
+              onPress={handleToggleDefault}
+              activeOpacity={0.7}
+              disabled={loading}
             >
-              {getCurrentDefaultLabel()}
-            </Text>
-            <Text style={styles.dropdownArrow}>
-              {showDefaultDropdown ? '▲' : '▼'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Ionicons
+                name={setAsDefault ? 'checkbox' : 'square-outline'}
+                size={20}
+                color={setAsDefault ? theme.colors.primary : theme.colors.textSecondary}
+              />
+              <Text style={styles.checkboxLabel}>Set as default login</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.navigateButton,
+                (!selectedRole || selectedRole === getCurrentSectionRole()) && styles.navigateButtonDisabled,
+                loading && styles.buttonDisabled,
+              ]}
+              onPress={handleNavigateToSection}
+              disabled={!selectedRole || selectedRole === getCurrentSectionRole() || loading}
+            >
+              <Text style={[
+                styles.navigateButtonText,
+                (!selectedRole || selectedRole === getCurrentSectionRole()) && styles.navigateButtonTextDisabled,
+              ]}>
+                Navigate
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
 
@@ -715,12 +752,16 @@ export const ProfileScreen: React.FC = () => {
         visible={showNavDropdown}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowNavDropdown(false)}
+        onRequestClose={() => {
+          setShowNavDropdown(false);
+        }}
       >
         <TouchableOpacity
           style={styles.dropdownOverlay}
           activeOpacity={1}
-          onPress={() => setShowNavDropdown(false)}
+          onPress={() => {
+            setShowNavDropdown(false);
+          }}
         >
           <View
             style={[
@@ -734,76 +775,36 @@ export const ProfileScreen: React.FC = () => {
             ]}
             onStartShouldSetResponder={() => true}
           >
-            {getAvailableRoles().map((role, index, array) => (
-              <TouchableOpacity
-                key={role}
-                style={[
-                  styles.dropdownItem,
-                  index === array.length - 1 && styles.dropdownItemLast,
-                ]}
-                onPress={() => {
-                  handleNavigateToSection(role);
-                  setShowNavDropdown(false);
-                }}
-              >
-                <Text style={styles.dropdownItemText}>{getRoleLabel(role)}</Text>
-              </TouchableOpacity>
-            ))}
+            {getAvailableRoles().map((role, index, array) => {
+              const isCurrentScreen = getCurrentSectionRole() === role;
+              return (
+                <TouchableOpacity
+                  key={role}
+                  style={[
+                    styles.dropdownItem,
+                    index === array.length - 1 && styles.dropdownItemLast,
+                    (selectedRole === role || isCurrentScreen) && styles.dropdownItemActive,
+                  ]}
+                  onPress={() => {
+                    handleSelectRole(role);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      (selectedRole === role || isCurrentScreen) && styles.dropdownItemTextActive,
+                    ]}
+                  >
+                    {getRoleLabel(role)}
+                    {isCurrentScreen && ' (Current)'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* Set Default View Dropdown Modal */}
-      <Modal
-        visible={showDefaultDropdown}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDefaultDropdown(false)}
-      >
-        <TouchableOpacity
-          style={styles.dropdownOverlay}
-          activeOpacity={1}
-          onPress={() => setShowDefaultDropdown(false)}
-        >
-          <View
-            style={[
-              styles.dropdownList,
-              {
-                position: 'absolute',
-                top: defaultDropdownLayout.y + defaultDropdownLayout.height + 4,
-                left: defaultDropdownLayout.x,
-                width: defaultDropdownLayout.width,
-              },
-            ]}
-            onStartShouldSetResponder={() => true}
-          >
-            {getAvailableRoles().map((role, index, array) => (
-              <TouchableOpacity
-                key={role}
-                style={[
-                  styles.dropdownItem,
-                  index === array.length - 1 && styles.dropdownItemLast,
-                  profile.default_role === role && styles.dropdownItemActive,
-                ]}
-                onPress={() => {
-                  handleSetDefaultView(role);
-                  setShowDefaultDropdown(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.dropdownItemText,
-                    profile.default_role === role && styles.dropdownItemTextActive,
-                  ]}
-                >
-                  {getDefaultRoleLabel(role)}
-                  {profile.default_role === role && ' ✓'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
 
       {/* Forgot Password Modal */}
       <ForgotPasswordModal
@@ -818,9 +819,9 @@ export const ProfileScreen: React.FC = () => {
       <BottomNavBar 
         currentScreen="Profile" 
         homeRoute={
-          profile?.role === UserRole.RESTAURANT 
+          profile?.default_role === UserRole.RESTAURANT 
             ? 'RestaurantHome' 
-            : profile?.role === UserRole.ADMIN 
+            : profile?.default_role === UserRole.ADMIN 
             ? 'AdminHome' 
             : 'UserHome'
         }
@@ -1159,6 +1160,44 @@ const styles = StyleSheet.create({
   dropdownItemTextActive: {
     color: theme.colors.primary,
     fontWeight: '600',
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderLight,
+  },
+  checkbox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    flex: 1,
+  },
+  checkboxLabel: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: theme.colors.textPrimary,
+  },
+  navigateButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.sm,
+    marginLeft: theme.spacing.sm,
+  },
+  navigateButtonDisabled: {
+    backgroundColor: theme.colors.border,
+    opacity: 0.5,
+  },
+  navigateButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  navigateButtonTextDisabled: {
+    color: theme.colors.textSecondary,
   },
   modalOverlay: {
     flex: 1,
