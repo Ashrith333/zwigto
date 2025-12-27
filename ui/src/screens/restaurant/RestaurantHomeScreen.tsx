@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { orderService, restaurantService, authService, menuService } from '../../services';
 import { Order, RestaurantProfile, OrderStatus } from '../../../shared/api-contracts';
@@ -9,6 +9,7 @@ import { BottomNavBar } from '../../components/BottomNavBar';
 
 export const RestaurantHomeScreen: React.FC = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(null);
   const [todayOrders, setTodayOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,7 +206,10 @@ export const RestaurantHomeScreen: React.FC = () => {
   if (!restaurant) {
     return (
       <View style={styles.container}>
-        <ScrollView style={styles.scrollContent}>
+        <ScrollView 
+          style={styles.scrollContent}
+          contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }}
+        >
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             <View style={styles.header}>
               <View style={styles.headerLeft}>
@@ -244,7 +248,10 @@ export const RestaurantHomeScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollContent}>
+      <ScrollView 
+        style={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }}
+      >
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           <View style={styles.header}>
           <View style={styles.headerLeft}>

@@ -10,6 +10,7 @@ import {
   Modal,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { userService, authService, restaurantService, orderService } from '../../services';
 import { UserProfile, UserRole, Order, OrderStatus } from '../../../shared/api-contracts';
@@ -17,6 +18,7 @@ import { BottomNavBar } from '../../components/BottomNavBar';
 
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
@@ -308,6 +310,7 @@ export const ProfileScreen: React.FC = () => {
     <View style={styles.container}>
       <ScrollView 
         style={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }}
         onScrollBeginDrag={() => {
           // Close dropdowns when scrolling
           setShowNavDropdown(false);

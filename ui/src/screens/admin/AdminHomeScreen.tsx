@@ -8,6 +8,7 @@ import { BottomNavBar } from '../../components/BottomNavBar';
 
 export const AdminHomeScreen: React.FC = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [stats, setStats] = useState({
     totalRestaurants: 0,
     activeRestaurants: 0,
@@ -67,7 +68,10 @@ export const AdminHomeScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollContent}>
+      <ScrollView 
+        style={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }}
+      >
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           <View style={styles.header}>
             <Text style={styles.title}>Admin Dashboard</Text>
